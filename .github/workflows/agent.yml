@@ -1,0 +1,48 @@
+name: Coding Agent (OpenHands)
+on:
+  issues:
+    types: [labeled]
+  issue_comment:
+    types: [created]
+
+permissions:
+  issues: write
+  pull-requests: write
+  contents: write
+
+jobs:
+  resolve-ticket:
+    if: >
+      (github.event_name == 'issues' && github.event.label.name == 'agent') ||
+      (github.event_name == 'issue_comment' && github.event.issue.pull_request != null)
+
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Extrair regras do repositório
+        id: rules
+        run: |
+          if [ -f AGENTS.md ]; then
+            echo "REGRAS<<EOF" >> $GITHUB_OUTPUT
+            cat AGENTS.md >> $GITHUB_OUTPUT
+            echo "EOF" >> $GITHUB_OUTPUT
+          else
+            echo "REGRAS=Entenda a estrutura e padrões do projeto e resolva a issue utilizando as skills e MCPs disponíveis em .agents/" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Execute OpenHands Task
+        uses: All-Hands-AI/openhands-action@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_API_KEY }}
+          LINEAR_API_KEY: ${{ secrets.LINEAR_API_KEY }}
+          MCP_SERVERS_CONFIG_PATH: ".agents/mcp_servers.json"
+        with:
+          llm_api_key: ${{ secrets.LLM_API_KEY }}
+          llm_base_url: 'https://openrouter.ai/api/v1'
+          llm_model: "openrouter/auto"
+          issue_number: ${{ github.event.issue.number }}
+          prompt: ${{ steps.rules.outputs.REGRAS }}

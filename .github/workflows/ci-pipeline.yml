@@ -1,0 +1,218 @@
+name: CI Pipeline
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, edited]
+    branches:
+      - main
+  push:
+    branches:
+      - main
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.head_ref || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  gitflow-validation:
+    name: Gitflow Compliance Check
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request'
+    steps:
+      - name: Validate Branch Name and PR Title (Gitflow & Conventional Commits)
+        env:
+          HEAD_REF: ${{ github.head_ref }}
+          PR_TITLE: ${{ github.event.pull_request.title }}
+        run: |
+          echo "=== Gitflow Compliance Check ==="
+          echo "Source branch: $HEAD_REF"
+          echo "PR title:      $PR_TITLE"
+
+          # 1. Validate Branch Naming according to docs/GITFLOW.md
+          # Expected format: (feature|hotfix|chore)/<identificador>-<descricao-kebab>
+          BRANCH_REGEX="^(feature|hotfix|chore)\/[A-Za-z0-9]+-[a-z0-9-]+$"
+
+          # Allow dependabot branches as an exception
+          if [[ "$HEAD_REF" =~ ^dependabot\/ ]]; then
+            echo "✅ Dependabot branch detected, skipping Gitflow branch prefix check."
+          elif [[ "$HEAD_REF" =~ $BRANCH_REGEX ]]; then
+            echo "✅ Branch name adheres to Gitflow: $HEAD_REF"
+          else
+            echo "❌ ERROR: Branch name '$HEAD_REF' violates Gitflow conventions (docs/GITFLOW.md)."
+            echo "Branch must match: (feature|hotfix|chore)/<identificador>-<descricao-kebab>"
+            echo "Examples:"
+            echo "  - feature/PROJ-102-auth-jwt"
+            echo "  - hotfix/SEC-99-sanitize-sql-input"
+            echo "  - chore/DEVOPS-45-upgrade-node-version"
+            exit 1
+          fi
+
+          # 2. Validate PR Title according to Conventional Commits
+          PR_TITLE_REGEX="^(feat|fix|chore|refactor|test|docs|style|perf|ci)(\([a-zA-Z0-9_.-]+\))?!?: .+$"
+
+          if [[ "$PR_TITLE" =~ $PR_TITLE_REGEX ]]; then
+            echo "✅ PR title adheres to Conventional Commits: $PR_TITLE"
+          else
+            echo "❌ ERROR: PR title '$PR_TITLE' violates Conventional Commits."
+            echo "PR title must follow: <type>(<scope-optional>): <description>"
+            echo "Valid types: feat, fix, chore, refactor, test, docs, style, perf, ci"
+            echo "Example: feat(auth): implement jwt validation"
+            exit 1
+          fi
+
+  lint-and-format:
+    name: Lint & Formatting Check
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Check code formatting (Prettier)
+        run: bun x prettier --check "Backend/src/**/*.ts" "Backend/test/**/*.ts" "Frontend/src/**/*.{ts,tsx,css,html}" "shared/src/**/*.ts"
+
+      - name: Run ESLint
+        run: bun run lint
+
+  typecheck-and-build:
+    name: Type Check & Monorepo Build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Build @startintech/shared
+        run: bun run build:shared
+
+      - name: Build Backend (NestJS)
+        run: bun run build:backend
+
+      - name: Build Frontend (React / Vite)
+        run: bun run build:frontend
+
+  unit-tests:
+    name: Vitest Unit & Integration Tests
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Build @startintech/shared
+        run: bun run build:shared
+
+      - name: Run Vitest Suite (Backend & Frontend)
+        run: bun run test
+
+  e2e-tests:
+    name: Playwright E2E Tests (Headless)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Build @startintech/shared
+        run: bun run build:shared
+
+      - name: Install Playwright Chromium & OS Dependencies
+        run: bunx playwright install --with-deps chromium
+
+      - name: Run Playwright E2E Tests
+        run: bun --cwd Frontend test:e2e
+        env:
+          CI: true
+
+      - name: Upload Playwright Test Report (On Failure)
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: Frontend/playwright-report/
+          retention-days: 7
+
+  docker-build-test:
+    name: Dockerfile Build Verification
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build Backend Docker Image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: Backend/Dockerfile
+          push: false
+          tags: startintech-backend:ci
+
+      - name: Build Frontend Docker Image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: Frontend/Dockerfile
+          push: false
+          tags: startintech-frontend:ci
+
+  terraform-check:
+    name: Terraform Validation (Infra)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Check for Infra directory changes
+        uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          filters: |
+            infra:
+              - 'Infra/**'
+
+      - name: Setup Terraform
+        if: steps.filter.outputs.infra == 'true'
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ~1.9.0
+
+      - name: Check Terraform formatting
+        if: steps.filter.outputs.infra == 'true'
+        run: terraform -chdir=Infra fmt -check
+
+      - name: Validate Terraform files
+        if: steps.filter.outputs.infra == 'true'
+        run: |
+          terraform -chdir=Infra init -backend=false
+          terraform -chdir=Infra validate

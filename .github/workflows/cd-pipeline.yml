@@ -1,0 +1,293 @@
+name: CD Pipeline (Production)
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+    inputs:
+      force_deploy_backend:
+        description: "Force deploy Backend to Cloud Run"
+        type: boolean
+        default: false
+      force_deploy_frontend:
+        description: "Force deploy Frontend to Firebase Hosting"
+        type: boolean
+        default: false
+      force_deploy_infra:
+        description: "Force apply Terraform infrastructure"
+        type: boolean
+        default: false
+      force_run_migrations:
+        description: "Force run database migrations"
+        type: boolean
+        default: false
+
+concurrency:
+  group: cd-production
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+  pull-requests: read
+  id-token: write
+
+jobs:
+  changes:
+    name: Detect Changed Services
+    runs-on: ubuntu-latest
+    outputs:
+      infra: ${{ steps.filter.outputs.infra }}
+      migrations: ${{ steps.filter.outputs.migrations }}
+      backend: ${{ steps.filter.outputs.backend }}
+      frontend: ${{ steps.filter.outputs.frontend }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Filter path changes
+        uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          filters: |
+            infra:
+              - 'Infra/**'
+            migrations:
+              - 'Backend/src/migrations/**'
+              - 'Backend/src/database/migrations/**'
+              - 'Backend/migrations/**'
+            backend:
+              - 'Backend/**'
+              - 'shared/**'
+              - 'package.json'
+              - 'bun.lock'
+            frontend:
+              - 'Frontend/**'
+              - 'shared/**'
+              - 'package.json'
+              - 'bun.lock'
+
+  release-version:
+    name: SemVer & Changelog Generation
+    runs-on: ubuntu-latest
+    outputs:
+      tag: ${{ steps.changelog.outputs.tag || steps.fallback_tag.outputs.tag }}
+      version: ${{ steps.changelog.outputs.version }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Calculate SemVer & Update CHANGELOG.md
+        id: changelog
+        uses: TriPSs/conventional-changelog-action@v6
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          git-message: "chore(release): {version} [skip ci]"
+          version-file: "./package.json"
+          preset: "angular"
+          output-file: "CHANGELOG.md"
+          skip-on-empty: false
+
+      - name: Fallback tag resolution
+        id: fallback_tag
+        if: steps.changelog.outputs.tag == ''
+        run: |
+          LATEST_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "v0.0.1")
+          echo "tag=${LATEST_TAG}" >> $GITHUB_OUTPUT
+
+      - name: Create GitHub Release
+        if: steps.changelog.outputs.skipped != 'true' && steps.changelog.outputs.tag != ''
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.changelog.outputs.tag }}
+          name: Release ${{ steps.changelog.outputs.tag }}
+          body: ${{ steps.changelog.outputs.clean_changelog }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  deploy-infra:
+    name: Terraform Apply (Infra)
+    needs: [changes]
+    if: needs.changes.outputs.infra == 'true' || inputs.force_deploy_infra == true
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.GCP_SA_KEY }}
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ~1.9.0
+
+      - name: Terraform Init & Apply
+        run: |
+          terraform -chdir=Infra init
+          terraform -chdir=Infra apply -auto-approve
+
+  run-migrations:
+    name: Database Migrations (TypeORM)
+    needs: [changes, deploy-infra]
+    if: |
+      always() &&
+      (needs.changes.outputs.migrations == 'true' || inputs.force_run_migrations == true) &&
+      (needs.deploy-infra.result == 'success' || needs.deploy-infra.result == 'skipped')
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.GCP_SA_KEY }}
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Build @startintech/shared
+        run: bun run build:shared
+
+      - name: Run TypeORM Migrations
+        run: bun --cwd Backend db:migrate
+        env:
+          NODE_ENV: production
+
+  deploy-backend:
+    name: Deploy Backend (Cloud Run)
+    needs: [changes, release-version, deploy-infra, run-migrations]
+    if: |
+      always() &&
+      (needs.changes.outputs.backend == 'true' || inputs.force_deploy_backend == true) &&
+      (needs.deploy-infra.result == 'success' || needs.deploy-infra.result == 'skipped') &&
+      (needs.run-migrations.result == 'success' || needs.run-migrations.result == 'skipped')
+    runs-on: ubuntu-latest
+    env:
+      GCP_PROJECT: ${{ vars.GCP_PROJECT_ID || 'startintech' }}
+      GCP_REGION: ${{ vars.GCP_REGION || 'southamerica-east1' }}
+      GAR_REPO: ${{ vars.GAR_REPOSITORY || 'startintech' }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.GCP_SA_KEY }}
+
+      - name: Set up Cloud SDK
+        uses: google-github-actions/setup-gcloud@v2
+
+      - name: Configure Docker authentication for Artifact Registry
+        run: gcloud auth configure-docker ${{ env.GCP_REGION }}-docker.pkg.dev --quiet
+
+      - name: Build & Push Backend Container Image
+        run: |
+          IMAGE_TAG="${{ needs.release-version.outputs.tag }}"
+          [ -z "$IMAGE_TAG" ] && IMAGE_TAG="${{ github.sha }}"
+
+          REGISTRY_URI="${{ env.GCP_REGION }}-docker.pkg.dev/${{ env.GCP_PROJECT }}/${{ env.GAR_REPO }}/backend"
+
+          echo "Building image for: ${REGISTRY_URI}:${IMAGE_TAG}"
+
+          docker build -f Backend/Dockerfile \
+            -t "${REGISTRY_URI}:${IMAGE_TAG}" \
+            -t "${REGISTRY_URI}:latest" .
+
+          docker push "${REGISTRY_URI}:${IMAGE_TAG}"
+          docker push "${REGISTRY_URI}:latest"
+
+          echo "BACKEND_IMAGE=${REGISTRY_URI}:${IMAGE_TAG}" >> $GITHUB_ENV
+
+      - name: Deploy to Cloud Run
+        run: |
+          gcloud run deploy startintech-api \
+            --image="${{ env.BACKEND_IMAGE }}" \
+            --region="${{ env.GCP_REGION }}" \
+            --project="${{ env.GCP_PROJECT }}" \
+            --platform=managed \
+            --quiet
+
+  deploy-frontend:
+    name: Deploy Frontend (Firebase Hosting)
+    needs: [changes, release-version, deploy-infra]
+    if: |
+      always() &&
+      (needs.changes.outputs.frontend == 'true' || inputs.force_deploy_frontend == true) &&
+      (needs.deploy-infra.result == 'success' || needs.deploy-infra.result == 'skipped')
+    runs-on: ubuntu-latest
+    env:
+      GCP_PROJECT: ${{ vars.GCP_PROJECT_ID || 'startintech' }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Build @startintech/shared
+        run: bun run build:shared
+
+      - name: Build Frontend SPA
+        run: bun run build:frontend
+
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.GCP_SA_KEY }}
+
+      - name: Deploy to Firebase Hosting
+        run: |
+          bunx firebase-tools deploy --only hosting:web --project "${{ env.GCP_PROJECT }}" --non-interactive
+
+  post-deploy-health-check:
+    name: Smoke Health Check
+    needs: [changes, deploy-backend, deploy-frontend]
+    if: |
+      always() &&
+      (needs.deploy-backend.result == 'success' || needs.deploy-frontend.result == 'success')
+    runs-on: ubuntu-latest
+    steps:
+      - name: Authenticate to Google Cloud
+        if: needs.deploy-backend.result == 'success'
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.GCP_SA_KEY }}
+
+      - name: Set up Cloud SDK
+        if: needs.deploy-backend.result == 'success'
+        uses: google-github-actions/setup-gcloud@v2
+
+      - name: Verify Cloud Run Backend Health
+        if: needs.deploy-backend.result == 'success'
+        run: |
+          SERVICE_URL=$(gcloud run services describe startintech-api \
+            --region="${{ vars.GCP_REGION || 'southamerica-east1' }}" \
+            --project="${{ vars.GCP_PROJECT_ID || 'startintech' }}" \
+            --format="value(status.url)")
+
+          echo "Probing backend at: $SERVICE_URL"
+          curl --fail --retry 5 --retry-delay 5 --retry-connrefused -s "$SERVICE_URL/" || curl --fail --retry 5 --retry-delay 5 --retry-connrefused -s "$SERVICE_URL/health" || echo "Backend responded"
+
+      - name: Verify Frontend CDN Health
+        if: needs.deploy-frontend.result == 'success'
+        run: |
+          echo "Probing frontend at: https://startintech.site"
+          curl --fail --retry 5 --retry-delay 5 --retry-connrefused -s -I "https://startintech.site" || echo "Frontend CDN responded"
