@@ -1,0 +1,42 @@
+{
+  "name": "startintech-monorepo",
+  "private": true,
+  "scripts": {
+    "dev:frontend": "bun --cwd Frontend dev",
+    "dev:backend": "bun --cwd Backend start:dev",
+    "build:shared": "bun --cwd shared build",
+    "build:backend": "bun --cwd Backend build",
+    "build:frontend": "bun --cwd Frontend build",
+    "build": "bun --cwd shared build && bun --cwd Backend build && bun --cwd Frontend build",
+    "docker:build": "docker compose build",
+    "docker:build:backend": "docker compose build backend",
+    "docker:build:frontend": "docker compose build frontend",
+    "docker:up": "docker compose up --build",
+    "docker:up:backend": "docker compose up --build backend",
+    "docker:up:frontend": "docker compose up --build frontend",
+    "docker:down": "docker compose down",
+    "lint:backend": "bun --cwd Backend lint",
+    "lint:frontend": "bun --cwd Frontend lint",
+    "lint": "bun --cwd Backend lint && bun --cwd Frontend lint",
+    "typecheck:backend": "bun --cwd Backend tsc --noEmit",
+    "typecheck:frontend": "bun --cwd Frontend tsc --noEmit",
+    "typecheck": "bun --cwd Backend tsc --noEmit && bun --cwd Frontend tsc --noEmit && bun --cwd shared tsc --noEmit",
+    "format:backend": "bun --cwd Backend format",
+    "format:frontend": "bun --cwd Frontend format",
+    "format": "bun --cwd Backend format && bun --cwd Frontend format && bunx prettier --write \"shared/src/**/*.ts\"",
+    "test": "bun --cwd Backend test && bun --cwd Frontend test",
+    "db:migrate": "bun --cwd Backend db:migrate",
+    "prepare": "husky"
+  },
+  "type": "module",
+  "workspaces": [
+    "Frontend",
+    "Backend",
+    "shared"
+  ],
+  "devDependencies": {
+    "@commitlint/cli": "^21.2.2",
+    "@commitlint/config-conventional": "^21.2.2",
+    "husky": "^9.1.7"
+  }
+}
