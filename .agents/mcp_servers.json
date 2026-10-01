@@ -1,0 +1,87 @@
+{
+  "mcpServers": {
+    "sentry": {
+      "command": "bunx",
+      "args": [
+        "-y",
+        "@modelcontextprotocol/server-sentry",
+        "--auth-token",
+        "env:SENTRY_API_KEY"
+      ]
+    },
+    "linear": {
+      "command": "bunx",
+      "args": [
+        "-y",
+        "@modelcontextprotocol/server-linear",
+        "--api-key",
+        "env:LINEAR_API_KEY"
+      ]
+    },
+    "puppeteer": {
+      "command": "bunx",
+      "args": [
+        "-y",
+        "@modelcontextprotocol/server-puppeteer"
+      ]
+    },
+    "context7": {
+      "type": "http",
+      "url": "https://mcp.context7.com/mcp",
+      "headers": {
+        "Authorization": "Bearer ${CONTEXT7_API_KEY}"
+      }
+    },
+    "playwright": {
+      "command": "npx",
+      "args": ["-y", "@executeautomation/playwright-mcp-server"]
+    },
+    "storybook": {
+      "url": "http://localhost:6006/mcp"
+    },
+    "shadcn": {
+      "command": "npx",
+      "args": ["-y", "shadcn@latest", "mcp"]
+    },
+    "vitest": {
+      "command": "npx",
+      "args": ["-y", "@madrus/vitest-mcp-server"],
+      "env": {
+        "VITEST_PROJECT_DIR": "~/Projects/StartInTech"
+      }
+    },
+    "postgres": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@modelcontextprotocol/server-postgres",
+        "postgresql://postgres:postgres@localhost:5432/startintech_db"
+      ]
+    },
+    "gcp": {
+      "command": "uv",
+      "args": [
+        "run",
+        "--with", "google-cloud-run",
+        "--with", "google-cloud-storage",
+        "--with", "google-cloud-secret-manager",
+        "mcp-server-gcp"
+      ],
+      "env": {
+        "GOOGLE_APPLICATION_CREDENTIALS": "${GCP_APP_CREDENTIALS_JSON}",
+        "GCP_PROJECT_ID": "startintech"
+      }
+    },
+    "fetch": {
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-fetch"]
+    },
+    "github": {
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-github"],
+      "env": {
+        "GITHUB_PERSONAL_ACCESS_TOKEN": "${GITHUB_PAT}"
+      }
+    }
+  }
+}
