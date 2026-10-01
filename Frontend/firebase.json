@@ -1,0 +1,31 @@
+{
+  "hosting": [
+    {
+      "target": "web",
+      "public": "dist",
+      "ignore": [
+        "firebase.json",
+        "**/.*",
+        "**/node_modules/**"
+      ],
+      "rewrites": [
+        {
+          "source": "**",
+          "destination": "/index.html"
+        }
+      ]
+    },
+    {
+      "target": "api",
+      "rewrites": [
+        {
+          "source": "**",
+          "run": {
+            "serviceId": "startintech-api",
+            "region": "southamerica-east1"
+          }
+        }
+      ]
+    }
+  ]
+}

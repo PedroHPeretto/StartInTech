@@ -1,0 +1,18 @@
+{
+  "projects": {
+    "default": "startintech"
+  },
+  "targets": {
+    "startintech": {
+      "hosting": {
+        "web": [
+          "startintech"
+        ],
+        "api": [
+          "startintech-api"
+        ]
+      }
+    }
+  }
+}
+
