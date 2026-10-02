@@ -31,15 +31,16 @@ jobs:
           # 1. Validate Branch Naming according to docs/GITFLOW.md
           # Expected format: (feature|hotfix|chore|fix)/<identificador>-<descricao-kebab>
           BRANCH_REGEX="^(feature|hotfix|chore|fix)\/[A-Za-z0-9]+-[a-z0-9-]+$"
+          STACK_BRANCH_REGEX="^feat\/[a-z0-9-]+$"
 
           # Allow dependabot branches as an exception
           if [[ "$HEAD_REF" =~ ^dependabot\/ ]]; then
             echo "✅ Dependabot branch detected, skipping Gitflow branch prefix check."
-          elif [[ "$HEAD_REF" =~ $BRANCH_REGEX ]]; then
+          elif [[ "$HEAD_REF" =~ $BRANCH_REGEX ]] || [[ "$HEAD_REF" =~ $STACK_BRANCH_REGEX ]]; then
             echo "✅ Branch name adheres to Gitflow: $HEAD_REF"
           else
             echo "❌ ERROR: Branch name '$HEAD_REF' violates Gitflow conventions (docs/GITFLOW.md)."
-            echo "Branch must match: (feature|hotfix|chore|fix)/<identificador>-<descricao-kebab>"
+            echo "Branch must match: (feature|hotfix|chore|fix)/<id>-<kebab> or feat/<kebab> (stack)"
             echo "Examples:"
             echo "  - feature/PROJ-102-auth-jwt"
             echo "  - hotfix/SEC-99-sanitize-sql-input"
