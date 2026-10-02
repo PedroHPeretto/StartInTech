@@ -23,12 +23,18 @@ test('mantém o dashboard após recarregar a página com sessão persistida', as
   await page.getByTestId('google-login-button').click();
 
   await expect(page).toHaveURL(/\/dashboard$/);
-  await expect(page.getByTestId('app-shell')).toBeVisible();
+  await expect(
+    page.getByRole('heading', { name: 'Dashboard' }),
+  ).toBeVisible();
+  await expect(page.getByTestId('dashboard-roadmap-link')).toBeVisible();
   await expect(page.getByTestId('google-login-button')).toHaveCount(0);
 
   await page.reload();
 
   await expect(page).toHaveURL(/\/dashboard$/);
-  await expect(page.getByTestId('app-shell')).toBeVisible();
+  await expect(
+    page.getByRole('heading', { name: 'Dashboard' }),
+  ).toBeVisible();
+  await expect(page.getByTestId('dashboard-roadmap-link')).toBeVisible();
   await expect(page.getByTestId('google-login-button')).toHaveCount(0);
 });
