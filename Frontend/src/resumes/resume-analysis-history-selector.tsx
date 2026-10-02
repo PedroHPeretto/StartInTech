@@ -34,7 +34,12 @@ export function ResumeAnalysisHistorySelector({
       <FilterPills
         options={options}
         selected={selectedId}
-        onChange={onSelect}
+        onChange={(selected) => {
+          const id = Array.isArray(selected) ? selected[0] : selected;
+          if (id) {
+            onSelect(id);
+          }
+        }}
       />
     </div>
   );
