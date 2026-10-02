@@ -1,25 +1,36 @@
 import { BadGatewayException, Inject, Injectable } from '@nestjs/common';
-import type {
-  GetJobsQueryDto,
-  PaginatedJobsResponseDto,
+import {
+  JobSortBy,
+  type GetJobsQueryDto,
+  type JobListingDto,
+  type PaginatedJobsResponseDto,
 } from '@startintech/shared';
 import * as Sentry from '@sentry/nestjs';
 import { ProfilesService } from '../profiles/profiles.service.js';
+import { ResumesService } from '../resumes/resumes.service.js';
 import { AdzunaJobAdapter } from './adzuna-job.adapter.js';
+import { JobMatchingService } from './job-matching.service.js';
 import {
   JOBS_REPOSITORY,
+  type JobListingRecord,
   type JobsRepository,
-  type ListJobsParams,
+  type ListJobsFilterParams,
 } from './jobs.repository.js';
 
 const DEFAULT_PAGE = 1;
 const DEFAULT_LIMIT = 10;
 const MAX_LIMIT = 50;
 
+interface EnrichedJobListing extends JobListingDto {
+  sortCreatedAt: Date;
+}
+
 @Injectable()
 export class JobsService {
   constructor(
     private readonly profiles: ProfilesService,
+    private readonly resumes: ResumesService,
+    private readonly matching: JobMatchingService,
     private readonly adzuna: AdzunaJobAdapter,
     @Inject(JOBS_REPOSITORY)
     private readonly jobs: JobsRepository,
@@ -32,27 +43,25 @@ export class JobsService {
     const profile = await this.profiles.getByUserId(userId);
     const page = query.page ?? DEFAULT_PAGE;
     const limit = Math.min(query.limit ?? DEFAULT_LIMIT, MAX_LIMIT);
-    const params: ListJobsParams = {
+    const filter: ListJobsFilterParams = {
       careerTrackId: profile.careerTrack.id,
       workplaceType: query.workplaceType,
       search: query.search,
-      page,
-      limit,
     };
 
-    let result = await this.jobs.findPaginated(params);
+    let listings = await this.jobs.findAllForListing(filter);
     const requiredRows = page * limit;
-    const isFullyCovered = result.total >= requiredRows;
+    const isFullyCovered = listings.length >= requiredRows;
 
     if (!isFullyCovered) {
       try {
-        const listings = await this.adzuna.searchJobs({
+        const adzunaListings = await this.adzuna.searchJobs({
           careerTrackName: profile.careerTrack.name,
           careerTrackSlug: profile.careerTrack.slug,
           page: 1,
         });
-        await this.jobs.upsertMany(profile.careerTrack.id, listings);
-        result = await this.jobs.findPaginated(params);
+        await this.jobs.upsertMany(profile.careerTrack.id, adzunaListings);
+        listings = await this.jobs.findAllForListing(filter);
       } catch (error) {
         Sentry.captureException(error);
         const cachedCount = await this.jobs.countActiveByCareerTrack(
@@ -64,11 +73,96 @@ export class JobsService {
       }
     }
 
-    return this.toPaginatedResponse(result.items, result.total, page, limit);
+    const { hasResumeAnalyzed, presentSkillIds } =
+      await this.resumes.findLatestPresentSkills(userId);
+    const presentSkillIdSet = new Set(presentSkillIds);
+
+    let enriched = listings.map((listing) =>
+      this.enrichListing(listing, hasResumeAnalyzed, presentSkillIdSet),
+    );
+
+    if (query.onlyHighCompatibility) {
+      enriched = enriched.filter(
+        (listing) => listing.match?.isHighCompatibility === true,
+      );
+    }
+
+    enriched = this.sortListings(enriched, query.sortBy);
+    const total = enriched.length;
+    const start = (page - 1) * limit;
+    const pageItems = enriched.slice(start, start + limit).map(
+      ({ sortCreatedAt: _sortCreatedAt, ...listing }) => listing,
+    );
+
+    return this.toPaginatedResponse(pageItems, total, page, limit);
+  }
+
+  private enrichListing(
+    listing: JobListingRecord,
+    hasResumeAnalyzed: boolean,
+    presentSkillIds: ReadonlySet<string>,
+  ): EnrichedJobListing {
+    const requirements = listing.requirements.map((requirement) => ({
+      id: requirement.id,
+      name: requirement.name,
+      isMandatory: requirement.isMandatory,
+    }));
+
+    return {
+      id: listing.id,
+      title: listing.title,
+      company: listing.company,
+      location: listing.location,
+      workplaceType: listing.workplaceType,
+      description: listing.description,
+      applicationUrl: listing.applicationUrl,
+      careerTrack: listing.careerTrack,
+      requirements,
+      match: hasResumeAnalyzed
+        ? this.matching.calculateMatch(listing.requirements, presentSkillIds)
+        : null,
+      sortCreatedAt: listing.createdAt,
+    };
+  }
+
+  private sortListings(
+    listings: EnrichedJobListing[],
+    sortBy?: JobSortBy,
+  ): EnrichedJobListing[] {
+    const sorted = [...listings];
+
+    if (sortBy === JobSortBy.NEWEST) {
+      sorted.sort((left, right) => {
+        const byDate =
+          right.sortCreatedAt.getTime() - left.sortCreatedAt.getTime();
+        if (byDate !== 0) {
+          return byDate;
+        }
+        return left.title.localeCompare(right.title, 'pt-BR');
+      });
+      return sorted;
+    }
+
+    if (sortBy === JobSortBy.MATCH_SCORE) {
+      sorted.sort((left, right) => {
+        const leftScore = left.match?.score ?? -1;
+        const rightScore = right.match?.score ?? -1;
+        if (rightScore !== leftScore) {
+          return rightScore - leftScore;
+        }
+        return left.title.localeCompare(right.title, 'pt-BR');
+      });
+      return sorted;
+    }
+
+    sorted.sort((left, right) =>
+      left.title.localeCompare(right.title, 'pt-BR'),
+    );
+    return sorted;
   }
 
   private toPaginatedResponse(
-    items: PaginatedJobsResponseDto['items'],
+    items: JobListingDto[],
     total: number,
     page: number,
     limit: number,

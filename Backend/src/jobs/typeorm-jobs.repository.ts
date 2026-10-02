@@ -5,8 +5,7 @@ import { JobOpportunity } from './job-opportunity.entity.js';
 import type {
   JobListingRecord,
   JobsRepository,
-  ListJobsParams,
-  ListJobsResult,
+  ListJobsFilterParams,
 } from './jobs.repository.js';
 import type { AdzunaJobListingInput } from './adzuna-job.adapter.js';
 
@@ -26,10 +25,14 @@ export class TypeOrmJobsRepository implements JobsRepository {
     });
   }
 
-  async findPaginated(params: ListJobsParams): Promise<ListJobsResult> {
+  async findAllForListing(
+    params: ListJobsFilterParams,
+  ): Promise<JobListingRecord[]> {
     const qb = this.jobs
       .createQueryBuilder('job')
       .innerJoinAndSelect('job.careerTrack', 'careerTrack')
+      .leftJoinAndSelect('job.jobSkills', 'jobSkill')
+      .leftJoinAndSelect('jobSkill.skill', 'skill')
       .where('job.is_active = true')
       .andWhere('careerTrack.id = :careerTrackId', {
         careerTrackId: params.careerTrackId,
@@ -47,18 +50,9 @@ export class TypeOrmJobsRepository implements JobsRepository {
       });
     }
 
-    const total = await qb.getCount();
+    const rows = await qb.orderBy('job.title', 'ASC').getMany();
 
-    const rows = await qb
-      .orderBy('job.title', 'ASC')
-      .skip((params.page - 1) * params.limit)
-      .take(params.limit)
-      .getMany();
-
-    return {
-      total,
-      items: rows.map((row) => this.toRecord(row)),
-    };
+    return rows.map((row) => this.toRecord(row));
   }
 
   async upsertMany(
@@ -81,9 +75,10 @@ export class TypeOrmJobsRepository implements JobsRepository {
               "career_track_id",
               "description",
               "application_url",
-              "is_active"
+              "is_active",
+              "created_at"
             )
-            VALUES ($1, $2, $3, $4, $5, $6, $7, true)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, true, now())
             ON CONFLICT ("application_url") DO UPDATE SET
               "title" = EXCLUDED."title",
               "company" = EXCLUDED."company",
@@ -107,6 +102,14 @@ export class TypeOrmJobsRepository implements JobsRepository {
   }
 
   private toRecord(job: JobOpportunity): JobListingRecord {
+    const requirements = (job.jobSkills ?? [])
+      .map((jobSkill) => ({
+        id: jobSkill.skill.id,
+        name: jobSkill.skill.name,
+        isMandatory: jobSkill.isMandatory,
+      }))
+      .sort((left, right) => left.name.localeCompare(right.name, 'pt-BR'));
+
     return {
       id: job.id,
       title: job.title,
@@ -115,10 +118,12 @@ export class TypeOrmJobsRepository implements JobsRepository {
       workplaceType: job.workplaceType,
       description: job.description,
       applicationUrl: job.applicationUrl,
+      createdAt: job.createdAt,
       careerTrack: {
         id: job.careerTrack.id,
         name: job.careerTrack.name,
       },
+      requirements,
     };
   }
 }
