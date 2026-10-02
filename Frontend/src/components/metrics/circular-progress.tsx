@@ -1,4 +1,7 @@
 import { cn } from '@/lib/utils';
+import { getSemanticStrokeColor } from '@/components/metrics/circular-progress-semantic';
+
+export type CircularProgressStrokeMode = 'default' | 'semantic';
 
 export interface CircularProgressProps {
   value: number;
@@ -6,7 +9,36 @@ export interface CircularProgressProps {
   size?: number;
   strokeWidth?: number;
   variant?: 'light' | 'dark';
+  strokeMode?: CircularProgressStrokeMode;
   className?: string;
+}
+
+function resolveStrokeColor(
+  normalizedValue: number,
+  isDark: boolean,
+  strokeMode: CircularProgressStrokeMode,
+): string {
+  if (strokeMode === 'semantic') {
+    return getSemanticStrokeColor(normalizedValue);
+  }
+  return isDark ? '#0284C7' : '#10B981';
+}
+
+function resolveLabelColor(
+  normalizedValue: number,
+  isDark: boolean,
+  strokeMode: CircularProgressStrokeMode,
+): string {
+  if (strokeMode === 'semantic') {
+    if (normalizedValue >= 80) {
+      return 'text-emerald-600';
+    }
+    if (normalizedValue >= 50) {
+      return 'text-amber-600';
+    }
+    return 'text-red-600';
+  }
+  return isDark ? 'text-sky-300' : 'text-brand-emerald';
 }
 
 export function CircularProgress({
@@ -15,6 +47,7 @@ export function CircularProgress({
   size = 140,
   strokeWidth = 10,
   variant = 'light',
+  strokeMode = 'default',
   className,
 }: CircularProgressProps) {
   const normalizedValue = Math.min(100, Math.max(0, Math.round(value)));
@@ -25,8 +58,8 @@ export function CircularProgress({
     circumference - (normalizedValue / 100) * circumference;
 
   const isDark = variant === 'dark';
+  const strokeColor = resolveStrokeColor(normalizedValue, isDark, strokeMode);
 
-  // Default status label based on score
   const computedLabel =
     label ??
     (normalizedValue >= 80
@@ -48,6 +81,7 @@ export function CircularProgress({
       )}
       style={{ width: size, height: size }}
       data-testid="circular-progress"
+      data-stroke-mode={strokeMode}
     >
       <svg
         width={size}
@@ -56,7 +90,6 @@ export function CircularProgress({
         className="-rotate-90 transform"
         aria-hidden="true"
       >
-        {/* Track circle */}
         <circle
           cx="50"
           cy="50"
@@ -66,12 +99,11 @@ export function CircularProgress({
           fill="none"
           strokeLinecap="round"
         />
-        {/* Fill circle */}
         <circle
           cx="50"
           cy="50"
           r={radius}
-          stroke={isDark ? '#0284C7' : '#10B981'}
+          stroke={strokeColor}
           strokeWidth={strokeWidth}
           fill="none"
           strokeDasharray={circumference}
@@ -79,10 +111,18 @@ export function CircularProgress({
           strokeLinecap="round"
           className="transition-all duration-700 ease-out"
           data-testid="circular-progress-fill"
+          data-semantic-tier={
+            strokeMode === 'semantic'
+              ? normalizedValue >= 80
+                ? 'high'
+                : normalizedValue >= 50
+                  ? 'medium'
+                  : 'low'
+              : undefined
+          }
         />
       </svg>
 
-      {/* Center Label */}
       <div className="absolute inset-0 flex flex-col items-center justify-center text-center">
         <span
           className={cn(
@@ -94,17 +134,17 @@ export function CircularProgress({
         >
           {normalizedValue}
         </span>
-        {computedLabel && (
+        {computedLabel ? (
           <span
             className={cn(
               'font-sans font-semibold mt-0.5 text-xs tracking-tight',
-              isDark ? 'text-sky-300' : 'text-brand-emerald',
+              resolveLabelColor(normalizedValue, isDark, strokeMode),
             )}
             data-testid="circular-progress-label"
           >
             {computedLabel}
           </span>
-        )}
+        ) : null}
       </div>
     </div>
   );

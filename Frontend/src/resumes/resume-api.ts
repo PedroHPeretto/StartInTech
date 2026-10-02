@@ -1,5 +1,7 @@
 import type {
   GenerateUploadUrlDto,
+  ResumeEvaluationResponseDto,
+  ResumeHistoryItemDto,
   ResumeSubmissionResponseDto,
   SkillsExtractionResponseDto,
   SubmitResumeDto,
@@ -37,6 +39,23 @@ export async function extractResumeSkills(
   const { data } = await apiClient.post<SkillsExtractionResponseDto>(
     `/api/v1/resumes/${resumeId}/extract-skills`,
     {},
+  );
+  return data;
+}
+
+export async function evaluateResume(
+  resumeId: string,
+): Promise<ResumeEvaluationResponseDto> {
+  const { data } = await apiClient.post<ResumeEvaluationResponseDto>(
+    `/api/v1/resumes/${resumeId}/evaluate`,
+    {},
+  );
+  return data;
+}
+
+export async function fetchResumeHistory(): Promise<ResumeHistoryItemDto[]> {
+  const { data } = await apiClient.get<ResumeHistoryItemDto[]>(
+    '/api/v1/resumes/history',
   );
   return data;
 }
