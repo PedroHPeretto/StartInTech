@@ -338,6 +338,14 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.GCP_SA_KEY }}
+
+      - name: Set up Cloud SDK
+        uses: google-github-actions/setup-gcloud@v2
+
       - name: Setup Bun
         uses: oven-sh/setup-bun@v2
         with:
@@ -349,13 +357,35 @@ jobs:
       - name: Build @startintech/shared
         run: bun run build:shared
 
+      - name: Resolve frontend build environment
+        run: |
+          VITE_GOOGLE_CLIENT_ID=""
+          if VITE_GOOGLE_CLIENT_ID=$(gcloud secrets versions access latest --secret=oauth_client_id --project="${{ env.GCP_PROJECT }}" 2>/dev/null); then
+            echo "Successfully retrieved oauth_client_id from GCP Secret Manager."
+          else
+            echo "::error::Could not access GCP Secret Manager secret oauth_client_id (project ${{ env.GCP_PROJECT }}). Ensure the deploy service account has secretAccessor on oauth_client_id."
+            exit 1
+          fi
+
+          if [ -z "$VITE_GOOGLE_CLIENT_ID" ]; then
+            echo "::error::Secret oauth_client_id is empty."
+            exit 1
+          fi
+
+          echo "::add-mask::$VITE_GOOGLE_CLIENT_ID"
+          echo "VITE_GOOGLE_CLIENT_ID=$VITE_GOOGLE_CLIENT_ID" >> "$GITHUB_ENV"
+
+          VITE_API_URL="${{ vars.VITE_API_URL }}"
+          if [ -z "$VITE_API_URL" ]; then
+            VITE_API_URL="https://api.startintech.site"
+          fi
+          echo "VITE_API_URL=$VITE_API_URL" >> "$GITHUB_ENV"
+
       - name: Build Frontend SPA
         run: bun run build:frontend
-
-      - name: Authenticate to Google Cloud
-        uses: google-github-actions/auth@v2
-        with:
-          credentials_json: ${{ secrets.GCP_SA_KEY }}
+        env:
+          VITE_GOOGLE_CLIENT_ID: ${{ env.VITE_GOOGLE_CLIENT_ID }}
+          VITE_API_URL: ${{ env.VITE_API_URL }}
 
       - name: Deploy to Firebase Hosting
         working-directory: Frontend
