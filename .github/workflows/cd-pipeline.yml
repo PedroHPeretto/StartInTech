@@ -307,6 +307,7 @@ jobs:
             --image="${{ env.BACKEND_IMAGE }}" \
             --region="${{ env.GCP_REGION }}" \
             --project="${{ env.GCP_PROJECT }}" \
+            --add-cloudsql-instances="${{ env.GCP_PROJECT }}:${{ env.GCP_REGION }}:startintech-db-instance" \
             --platform=managed \
             --quiet
 
