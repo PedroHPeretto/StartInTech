@@ -25,9 +25,21 @@ import { UsersModule } from './users/users.module.js';
             useFactory: (config: ConfigService) => {
               const url =
                 config.get<string>('DATABASE_URL') || process.env.DATABASE_URL;
+
+              if (url) {
+                return {
+                  type: 'postgres',
+                  url,
+                  synchronize: false,
+                  logging: process.env.NODE_ENV === 'development',
+                  autoLoadEntities: true,
+                  retryAttempts: 5,
+                  retryDelay: 2000,
+                };
+              }
+
               return {
                 ...dataSourceOptions,
-                ...(url ? { url } : {}),
                 autoLoadEntities: true,
                 retryAttempts: 5,
                 retryDelay: 2000,
