@@ -312,9 +312,8 @@ export class ResumesService {
       throw new NotFoundException('Resume analysis not found');
     }
 
-    const activeVersionsCount = (
-      await this.resumes.listHistoryForUser(userId)
-    ).length;
+    const activeVersionsCount = (await this.resumes.listHistoryForUser(userId))
+      .length;
 
     if (
       analysis.atsScore !== null &&

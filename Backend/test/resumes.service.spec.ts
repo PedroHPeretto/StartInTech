@@ -80,9 +80,7 @@ class InMemoryResumesRepository implements ResumesRepository {
       userId: params.userId,
       fileUrl: params.fileUrl,
       rawText: params.rawText,
-      createdAt: new Date(
-        `2026-01-0${this.createdAtSequence}T00:00:00.000Z`,
-      ),
+      createdAt: new Date(`2026-01-0${this.createdAtSequence}T00:00:00.000Z`),
       atsScore: null,
       feedbackReport: null,
     };
@@ -112,14 +110,10 @@ class InMemoryResumesRepository implements ResumesRepository {
     }
     const links = this.skillsByAnalysis.get(id) ?? [];
     const presentSkillNames = links
-      .filter(
-        (link) => link.status === ResumeAnalysisSkillStatus.PRESENT,
-      )
+      .filter((link) => link.status === ResumeAnalysisSkillStatus.PRESENT)
       .map((link) => link.name);
     const missingSkillNames = links
-      .filter(
-        (link) => link.status === ResumeAnalysisSkillStatus.MISSING_GAP,
-      )
+      .filter((link) => link.status === ResumeAnalysisSkillStatus.MISSING_GAP)
       .map((link) => link.name);
 
     return Promise.resolve({
@@ -292,13 +286,7 @@ function createService() {
   const profiles = createProfilesMock();
   const ai = createAiMock();
   const atsScoring = new AtsScoringService();
-  const service = new ResumesService(
-    repository,
-    profiles,
-    gcs,
-    ai,
-    atsScoring,
-  );
+  const service = new ResumesService(repository, profiles, gcs, ai, atsScoring);
   return { service, repository, gcs, profiles, ai };
 }
 
@@ -416,7 +404,9 @@ describe('ResumesService', () => {
     const first = await service.extractSkills(AUTHENTICATED_USER_ID, resumeId);
     expect(first.skills.detected[0]?.name).toBe('TypeScript');
 
-    (ai.extractSkillsFromResume as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+    (
+      ai.extractSkillsFromResume as ReturnType<typeof vi.fn>
+    ).mockResolvedValueOnce({
       detectedSkills: [
         { name: 'typescript', category: SkillCategory.LANGUAGE },
       ],
@@ -481,7 +471,9 @@ describe('ResumesService', () => {
       rawText: 'a'.repeat(120),
       createdAt: new Date(),
     });
-    (ai.extractSkillsFromResume as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+    (
+      ai.extractSkillsFromResume as ReturnType<typeof vi.fn>
+    ).mockResolvedValueOnce({
       detectedSkills: [],
       missingSkills: [],
       insufficientText: true,
@@ -533,9 +525,9 @@ describe('ResumesService', () => {
       thirdId,
       repository.records[2]?.id,
     ]);
-    expect(
-      repository.records.some((record) => record.id === firstId),
-    ).toBe(false);
+    expect(repository.records.some((record) => record.id === firstId)).toBe(
+      false,
+    );
   });
 
   it('returns 409 when evaluating a resume without extracted skills', async () => {
@@ -630,9 +622,7 @@ describe('ResumesService', () => {
     });
 
     expect(
-      repository.records.some(
-        (record) => record.fileUrl === purgedUrl,
-      ),
+      repository.records.some((record) => record.fileUrl === purgedUrl),
     ).toBe(false);
     expect(repository.pendingPurges).toEqual([
       { id: 'purge-1', fileUrl: purgedUrl },
@@ -648,7 +638,9 @@ describe('ResumesService', () => {
       rawText: 'a'.repeat(120),
       createdAt: new Date(),
     });
-    (ai.extractSkillsFromResume as ReturnType<typeof vi.fn>).mockRejectedValueOnce(
+    (
+      ai.extractSkillsFromResume as ReturnType<typeof vi.fn>
+    ).mockRejectedValueOnce(
       new BadGatewayException('Skill extraction provider unavailable'),
     );
 

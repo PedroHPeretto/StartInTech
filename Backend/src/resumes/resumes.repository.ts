@@ -65,7 +65,9 @@ export interface PersistedSkillExtraction {
 }
 
 export interface ResumesRepository {
-  create(params: CreateResumeAnalysisParams): Promise<CreateResumeAnalysisResult>;
+  create(
+    params: CreateResumeAnalysisParams,
+  ): Promise<CreateResumeAnalysisResult>;
   findByIdForUser(
     id: string,
     userId: string,
