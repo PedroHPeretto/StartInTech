@@ -178,10 +178,13 @@ jobs:
 
       - name: Run TypeORM Migrations
         run: |
-          # 1. Resolve raw database URL from repository secrets or Secret Manager
-          RAW_DB_URL="${{ secrets.DATABASE_URL }}"
-          if [ -z "$RAW_DB_URL" ]; then
-            RAW_DB_URL=$(gcloud secrets versions access latest --secret="db_secret" --project="${{ env.GCP_PROJECT }}" 2>/dev/null || true)
+          # 1. Resolve raw database URL from Secret Manager (primary) or repository secrets fallback
+          RAW_DB_URL=""
+          if RAW_DB_URL=$(gcloud secrets versions access latest --secret="db_secret" --project="${{ env.GCP_PROJECT }}" 2>/dev/null); then
+            echo "Successfully retrieved database credentials from GCP Secret Manager (db_secret)."
+          else
+            echo "::notice::Could not access GCP Secret Manager db_secret, checking repository secrets fallback."
+            RAW_DB_URL="${{ secrets.DATABASE_URL }}"
           fi
 
           if [ -z "$RAW_DB_URL" ]; then
