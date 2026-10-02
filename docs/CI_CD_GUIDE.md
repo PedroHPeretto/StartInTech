@@ -146,8 +146,9 @@ flowchart TD
    - Runs if `Infra/**` was modified or force toggle is enabled.
    - Executes `terraform init` and `terraform apply -auto-approve`.
 4. **Database Migrations (TypeORM)**:
-   - Runs if migration files changed.
    - Runs if migration files changed or force toggle is enabled.
+   - Launches Cloud SQL Auth Proxy to securely tunnel to the Cloud SQL PostgreSQL instance (`startintech-db-instance`) on `127.0.0.1:5432`.
+   - Resolves `DATABASE_URL` dynamically from Secret Manager (`db_secret`) or repository secrets.
    - Executes `bun --cwd Backend db:migrate` against the production database.
 5. **Backend Deployment (Cloud Run)**:
    - Authenticates with Google Cloud.
@@ -197,9 +198,10 @@ The Service Account configured in `GCP_SA_KEY` requires the following roles on t
 1. **Cloud Run Admin** (`roles/run.admin`): To deploy revisions to `startintech-api`.
 2. **Artifact Registry Writer** (`roles/artifactregistry.writer`): To push Docker images.
 3. **Firebase Hosting Admin** (`roles/firebasehosting.admin`): To deploy frontend SPA to Firebase CDN.
-4. **Service Account User** (`roles/iam.serviceAccountUser`): To act as the runtime service account (`startintech-api-sa`).
 4. **Service Account User** (`roles/iam.serviceAccountUser`): To act as runtime service account (`startintech-api-sa`).
 5. **Storage Object Admin** (`roles/storage.objectAdmin`): For Terraform remote state in GCS.
+6. **Secret Manager Secret Accessor** (`roles/secretmanager.secretAccessor`): To retrieve `db_secret` for database migrations.
+7. **Cloud SQL Client** (`roles/cloudsql.client`): To connect to Cloud SQL instances via the Cloud SQL Auth Proxy during migrations.
 
 ---
 
