@@ -16,6 +16,8 @@ export * from './navigation/sidebar';
 export * from './navigation/page-header';
 export * from './navigation/page-footer';
 export * from './navigation/mobile-bottom-nav';
+export * from './navigation/app-nav';
+export * from './navigation/app-shell';
 
 // Metrics & Scores
 export * from './metrics/match-score';

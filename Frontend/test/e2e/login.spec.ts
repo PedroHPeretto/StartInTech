@@ -21,11 +21,10 @@ test('redireciona para onboarding após login Google com perfil incompleto', asy
 
   await page.goto('/login');
   await expect(page.getByTestId('google-login-button')).toBeVisible();
+  await expect(page.getByTestId('app-shell')).toHaveCount(0);
 
   await page.getByTestId('google-login-button').click();
 
   await expect(page).toHaveURL(/\/onboarding$/);
-  await expect(
-    page.getByRole('heading', { name: 'Onboarding' }),
-  ).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Onboarding' })).toBeVisible();
 });

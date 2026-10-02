@@ -23,7 +23,7 @@ const SEARCH_DEBOUNCE_MS = 400;
 
 function JobsPageShell({ children }: { children: ReactNode }) {
   return (
-    <main className="min-h-screen bg-brand-light-gray px-4 py-8 sm:py-10">
+    <main className="flex flex-1 flex-col bg-brand-light-gray px-4 py-8 sm:py-10">
       <div className="mx-auto w-full max-w-3xl rounded-2xl border border-border bg-background p-6 shadow-sm sm:p-8">
         <div className="mb-8 flex justify-center">
           <BrandHeader href={undefined} showTagline />
