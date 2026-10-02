@@ -2,12 +2,14 @@ import {
   Body,
   Controller,
   HttpCode,
+  Param,
   Post,
   Req,
   UseGuards,
 } from '@nestjs/common';
 import type {
   ResumeSubmissionResponseDto,
+  SkillsExtractionResponseDto,
   UploadUrlResponseDto,
 } from '@startintech/shared';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard.js';
@@ -43,5 +45,15 @@ export class ResumesController {
     @Body() body: SubmitResumeRequestDto,
   ): Promise<ResumeSubmissionResponseDto> {
     return this.resumesService.submit(request.user.userId, body);
+  }
+
+  @Post(':id/extract-skills')
+  @HttpCode(200)
+  @UseGuards(JwtAuthGuard)
+  extractSkills(
+    @Req() request: AuthenticatedRequest,
+    @Param('id') resumeId: string,
+  ): Promise<SkillsExtractionResponseDto> {
+    return this.resumesService.extractSkills(request.user.userId, resumeId);
   }
 }
