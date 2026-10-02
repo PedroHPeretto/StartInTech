@@ -293,6 +293,42 @@ export interface JobRecommendationCardDto extends JobOpportunityDto {
   missingSkills: string[];
 }
 
+export interface GetJobsQueryDto {
+  page?: number;
+  limit?: number;
+  workplaceType?: WorkplaceType;
+  search?: string;
+}
+
+export interface JobListingCareerTrackDto {
+  id: string;
+  name: string;
+}
+
+export interface JobListingDto {
+  id: string;
+  title: string;
+  company: string;
+  location: string;
+  workplaceType: WorkplaceType;
+  description: string;
+  applicationUrl: string;
+  careerTrack: JobListingCareerTrackDto;
+}
+
+export interface PaginatedJobsMetaDto {
+  total: number;
+  page: number;
+  limit: number;
+  totalPages: number;
+  hasNextPage: boolean;
+}
+
+export interface PaginatedJobsResponseDto {
+  items: JobListingDto[];
+  meta: PaginatedJobsMetaDto;
+}
+
 export interface RoadmapGraphNodeDto {
   id: string;
   title: string;

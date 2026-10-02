@@ -10,6 +10,7 @@ import { CurriculumAnalysisPage } from '@/pages/curriculum-analysis-page';
 import { CurriculumUploadPage } from '@/pages/curriculum-upload-page';
 import { LoginPage } from '@/pages/login-page';
 import { OnboardingPage } from '@/pages/onboarding-page';
+import { JobsPage } from '@/pages/jobs-page';
 import { RoadmapPage } from '@/pages/roadmap-page';
 import type { RouterContext } from '@/routes/router-context';
 import { getPostAuthRoute } from '@/auth/redirect-after-auth';
@@ -102,6 +103,21 @@ const roadmapRoute = createRoute({
   component: RoadmapPage,
 });
 
+const jobsRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/jobs',
+  beforeLoad: ({ context }) => {
+    const { auth } = context;
+    if (!auth.isAuthenticated) {
+      throw redirect({ to: '/login' });
+    }
+    if (!auth.isProfileComplete) {
+      throw redirect({ to: '/onboarding' });
+    }
+  },
+  component: JobsPage,
+});
+
 const curriculumAnalysisRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: '/curriculum/analysis/$id',
@@ -123,6 +139,7 @@ const routeTree = rootRoute.addChildren([
   onboardingRoute,
   dashboardRoute,
   roadmapRoute,
+  jobsRoute,
   curriculumUploadRoute,
   curriculumAnalysisRoute,
 ]);
