@@ -1,7 +1,6 @@
 import {
   ResumeAnalysisSkillStatus,
   type ExtractedSkillDto,
-  type FeedbackReportDto,
   type ResumeHistoryItemDto,
 } from '@startintech/shared';
 import { ConflictException, Injectable } from '@nestjs/common';
