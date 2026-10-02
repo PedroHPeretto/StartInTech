@@ -4,6 +4,7 @@ import { AuthModule } from '../auth/auth.module.js';
 import { ProfilesModule } from '../profiles/profiles.module.js';
 import { CareerRoadmap } from './career-roadmap.entity.js';
 import { RoadmapNode } from './roadmap-node.entity.js';
+import { RoadmapShClient } from './roadmap-sh.client.js';
 import { RoadmapsController } from './roadmaps.controller.js';
 import { ROADMAPS_REPOSITORY } from './roadmaps.repository.js';
 import { RoadmapsService } from './roadmaps.service.js';
@@ -18,6 +19,7 @@ import { TypeOrmRoadmapsRepository } from './typeorm-roadmaps.repository.js';
   controllers: [RoadmapsController],
   providers: [
     RoadmapsService,
+    RoadmapShClient,
     TypeOrmRoadmapsRepository,
     {
       provide: ROADMAPS_REPOSITORY,
