@@ -91,7 +91,8 @@ test.describe('curriculum upload', () => {
 
     await expect(page.getByTestId('resume-received')).toBeVisible();
     await expect(page.getByTestId('resume-received')).toContainText(
-      'aguardando processamento',
+      'Continue para extrair competências',
     );
+    await expect(page.getByTestId('curriculum-analysis-link')).toBeVisible();
   });
 });
