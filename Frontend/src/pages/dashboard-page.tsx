@@ -5,7 +5,7 @@ export function DashboardPage() {
   const { profile } = useAuth();
 
   return (
-    <main className="flex min-h-screen items-center justify-center bg-brand-blue px-4">
+    <main className="flex flex-1 items-center justify-center bg-brand-blue px-4 py-10">
       <section className="w-full max-w-md rounded-2xl border border-border bg-background p-8 text-center shadow-sm">
         <h1 className="font-heading text-2xl font-bold text-brand-midnight">
           Dashboard

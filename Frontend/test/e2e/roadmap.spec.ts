@@ -45,6 +45,7 @@ async function loginWithCompleteProfile(page: import('@playwright/test').Page) {
   await page.goto('/login');
   await page.getByTestId('google-login-button').click();
   await expect(page).toHaveURL(/\/dashboard$/);
+  await expect(page.getByTestId('app-shell')).toBeVisible();
 }
 
 test.describe('career roadmap', () => {
@@ -79,7 +80,10 @@ test.describe('career roadmap', () => {
     });
 
     await loginWithCompleteProfile(page);
-    await page.getByTestId('dashboard-roadmap-link').click();
+    await page
+      .getByRole('navigation', { name: 'Navegação principal' })
+      .getByRole('button', { name: 'Trilhas de Carreira' })
+      .click();
     await expect(page).toHaveURL(/\/roadmap$/);
 
     await expect(page.getByTestId('roadmap-skeleton')).toBeVisible();
@@ -116,4 +120,5 @@ test('unauthenticated visit to roadmap redirects to login', async ({
 }) => {
   await page.goto('/roadmap');
   await expect(page).toHaveURL(/\/login$/);
+  await expect(page.getByTestId('app-shell')).toHaveCount(0);
 });

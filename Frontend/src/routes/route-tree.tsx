@@ -5,6 +5,7 @@ import {
   Outlet,
   redirect,
 } from '@tanstack/react-router';
+import { AppShell } from '@/components/navigation/app-shell';
 import { DashboardPage } from '@/pages/dashboard-page';
 import { CurriculumAnalysisPage } from '@/pages/curriculum-analysis-page';
 import { CurriculumUploadPage } from '@/pages/curriculum-upload-page';
@@ -30,6 +31,12 @@ const indexRoute = createRoute({
   },
 });
 
+const authenticatedLayoutRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  id: 'authenticated-layout',
+  component: AppShell,
+});
+
 const loginRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: '/login',
@@ -43,7 +50,7 @@ const loginRoute = createRoute({
 });
 
 const onboardingRoute = createRoute({
-  getParentRoute: () => rootRoute,
+  getParentRoute: () => authenticatedLayoutRoute,
   path: '/onboarding',
   beforeLoad: ({ context }) => {
     const { auth } = context;
@@ -58,7 +65,7 @@ const onboardingRoute = createRoute({
 });
 
 const dashboardRoute = createRoute({
-  getParentRoute: () => rootRoute,
+  getParentRoute: () => authenticatedLayoutRoute,
   path: '/dashboard',
   beforeLoad: ({ context }) => {
     const { auth } = context;
@@ -73,7 +80,7 @@ const dashboardRoute = createRoute({
 });
 
 const curriculumUploadRoute = createRoute({
-  getParentRoute: () => rootRoute,
+  getParentRoute: () => authenticatedLayoutRoute,
   path: '/curriculum/upload',
   beforeLoad: ({ context }) => {
     const { auth } = context;
@@ -88,7 +95,7 @@ const curriculumUploadRoute = createRoute({
 });
 
 const roadmapRoute = createRoute({
-  getParentRoute: () => rootRoute,
+  getParentRoute: () => authenticatedLayoutRoute,
   path: '/roadmap',
   beforeLoad: ({ context }) => {
     const { auth } = context;
@@ -103,7 +110,7 @@ const roadmapRoute = createRoute({
 });
 
 const curriculumAnalysisRoute = createRoute({
-  getParentRoute: () => rootRoute,
+  getParentRoute: () => authenticatedLayoutRoute,
   path: '/curriculum/analysis/$id',
   beforeLoad: ({ context }) => {
     const { auth } = context;
@@ -120,11 +127,13 @@ const curriculumAnalysisRoute = createRoute({
 const routeTree = rootRoute.addChildren([
   indexRoute,
   loginRoute,
-  onboardingRoute,
-  dashboardRoute,
-  roadmapRoute,
-  curriculumUploadRoute,
-  curriculumAnalysisRoute,
+  authenticatedLayoutRoute.addChildren([
+    onboardingRoute,
+    dashboardRoute,
+    roadmapRoute,
+    curriculumUploadRoute,
+    curriculumAnalysisRoute,
+  ]),
 ]);
 
 export const router = createRouter({
