@@ -3,14 +3,7 @@ import {
   type GenerateUploadUrlDto,
   type ResumeUploadFileType,
 } from '@startintech/shared';
-import {
-  IsIn,
-  IsInt,
-  IsNotEmpty,
-  IsString,
-  Max,
-  Min,
-} from 'class-validator';
+import { IsIn, IsInt, IsNotEmpty, IsString, Max, Min } from 'class-validator';
 
 const ALLOWED_FILE_TYPES: ResumeUploadFileType[] = [
   'application/pdf',

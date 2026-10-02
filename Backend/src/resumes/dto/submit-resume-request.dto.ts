@@ -17,15 +17,16 @@ export class SubmitResumeRequestDto implements SubmitResumeDto {
   @IsEnum(ResumeSubmissionMode)
   mode!: ResumeSubmissionMode;
 
-  @ValidateIf((dto: SubmitResumeRequestDto) =>
-    dto.mode === ResumeSubmissionMode.FILE_UPLOAD,
+  @ValidateIf(
+    (dto: SubmitResumeRequestDto) =>
+      dto.mode === ResumeSubmissionMode.FILE_UPLOAD,
   )
   @IsString()
   @IsOptional()
   fileKey?: string;
 
-  @ValidateIf((dto: SubmitResumeRequestDto) =>
-    dto.mode === ResumeSubmissionMode.RAW_TEXT,
+  @ValidateIf(
+    (dto: SubmitResumeRequestDto) => dto.mode === ResumeSubmissionMode.RAW_TEXT,
   )
   @IsString()
   @MinLength(RESUME_RAW_TEXT_MIN_LENGTH)
