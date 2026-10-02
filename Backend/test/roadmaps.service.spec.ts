@@ -175,6 +175,7 @@ describe('RoadmapsService', () => {
           priority: SkillPriority.ESSENTIAL,
           sequenceOrder: 1,
           skillId: null,
+          lessons: [],
           children: [
             {
               id: 'logica',
@@ -183,6 +184,7 @@ describe('RoadmapsService', () => {
               priority: SkillPriority.ESSENTIAL,
               sequenceOrder: 1,
               skillId: null,
+              lessons: [],
               children: [
                 {
                   id: 'estruturas',
@@ -191,6 +193,7 @@ describe('RoadmapsService', () => {
                   priority: SkillPriority.RECOMMENDED,
                   sequenceOrder: 1,
                   skillId: null,
+                  lessons: [],
                   children: [],
                 },
               ],
