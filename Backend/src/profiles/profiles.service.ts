@@ -62,4 +62,25 @@ export class ProfilesService {
       throw error;
     }
   }
+
+  async getByUserId(userId: string): Promise<ProfileResponseDto> {
+    const profile = await this.profiles.findByUserId(userId);
+    if (!profile) {
+      throw new NotFoundException('Profile not found');
+    }
+
+    return {
+      id: profile.id,
+      userId: profile.userId,
+      fullName: profile.fullName,
+      seniorityLevel: profile.seniorityLevel,
+      bio: profile.bio,
+      careerTrack: {
+        id: profile.careerTrack.id,
+        name: profile.careerTrack.name,
+        slug: profile.careerTrack.slug,
+      },
+      isProfileComplete: true,
+    };
+  }
 }

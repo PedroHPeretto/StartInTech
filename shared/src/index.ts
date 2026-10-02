@@ -308,3 +308,21 @@ export interface RoadmapGraphDto {
   careerTrack: CareerTrackDto;
   nodes: RoadmapGraphNodeDto[];
 }
+
+export interface RoadmapNodeResponseDto {
+  id: string;
+  title: string;
+  description: string | null;
+  priority: SkillPriority;
+  sequenceOrder: number;
+  skillId: string | null;
+  children: RoadmapNodeResponseDto[];
+}
+
+export interface RoadmapDetailResponseDto {
+  id: string;
+  title: string;
+  description: string | null;
+  careerTrack: CareerTrackSummaryDto;
+  nodes: RoadmapNodeResponseDto[];
+}
