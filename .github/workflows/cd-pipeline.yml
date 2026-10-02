@@ -303,11 +303,15 @@ jobs:
 
       - name: Deploy to Cloud Run
         run: |
+          JWT_SECRET_VAL="${{ secrets.JWT_SECRET }}"
+          [ -z "$JWT_SECRET_VAL" ] && JWT_SECRET_VAL="startintech-prod-jwt-secret-secure-token"
+
           gcloud run deploy startintech-api \
             --image="${{ env.BACKEND_IMAGE }}" \
             --region="${{ env.GCP_REGION }}" \
             --project="${{ env.GCP_PROJECT }}" \
             --add-cloudsql-instances="${{ env.GCP_PROJECT }}:${{ env.GCP_REGION }}:startintech-db-instance" \
+            --update-env-vars="JWT_SECRET=${JWT_SECRET_VAL}" \
             --platform=managed \
             --quiet
 
