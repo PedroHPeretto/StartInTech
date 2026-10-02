@@ -1,39 +1,45 @@
-import { Inject, Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
 import type { RoadmapDetailResponseDto } from '@startintech/shared';
 import { ProfilesService } from '../profiles/profiles.service.js';
-import { buildRoadmapTree } from './build-roadmap-tree.js';
-import {
-  ROADMAPS_REPOSITORY,
-  type RoadmapsRepository,
-} from './roadmaps.repository.js';
+import { RoadmapShClient } from './roadmap-sh.client.js';
 
 @Injectable()
 export class RoadmapsService {
   constructor(
     private readonly profiles: ProfilesService,
-    @Inject(ROADMAPS_REPOSITORY)
-    private readonly roadmaps: RoadmapsRepository,
+    private readonly roadmapSh: RoadmapShClient,
   ) {}
 
   async getMyTrack(userId: string): Promise<RoadmapDetailResponseDto> {
     const profile = await this.profiles.getByUserId(userId);
-    const roadmap = await this.roadmaps.findWithNodesByCareerTrackId(
-      profile.careerTrack.id,
+    const roadmapSlug = this.roadmapSh.resolveRoadmapSlug(
+      profile.careerTrack.slug,
     );
-    if (!roadmap) {
+    if (!roadmapSlug) {
+      throw new NotFoundException('Career roadmap not found');
+    }
+
+    let track: Awaited<ReturnType<RoadmapShClient['fetchTrack']>>;
+    try {
+      track = await this.roadmapSh.fetchTrack(roadmapSlug);
+    } catch {
+      throw new NotFoundException('Career roadmap not found');
+    }
+
+    if (!track) {
       throw new NotFoundException('Career roadmap not found');
     }
 
     return {
-      id: roadmap.id,
-      title: roadmap.title,
-      description: roadmap.description,
+      id: track.id,
+      title: track.title,
+      description: track.description,
       careerTrack: {
         id: profile.careerTrack.id,
         name: profile.careerTrack.name,
         slug: profile.careerTrack.slug,
       },
-      nodes: buildRoadmapTree(roadmap.nodes),
+      nodes: track.nodes,
     };
   }
 }

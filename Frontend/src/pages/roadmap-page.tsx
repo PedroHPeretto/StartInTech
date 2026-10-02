@@ -1,10 +1,11 @@
 import {
   SkillPriority,
   type RoadmapDetailResponseDto,
+  type RoadmapLessonDto,
   type RoadmapNodeResponseDto,
 } from '@startintech/shared';
 import axios from 'axios';
-import { ChevronDown } from 'lucide-react';
+import { ChevronDown, ExternalLink } from 'lucide-react';
 import { useEffect, useState, type ReactNode } from 'react';
 import { BrandHeader } from '@/components/brand/brand-header';
 import { AlertBanner } from '@/components/feedback/alert-banner';
@@ -81,9 +82,57 @@ function RoadmapNodeHeading({
   );
 }
 
+function RoadmapLessonList({ lessons }: { lessons: RoadmapLessonDto[] }) {
+  if (lessons.length === 0) {
+    return null;
+  }
+
+  return (
+    <ul
+      className="mt-3 flex flex-col gap-2 border-t border-border pt-3"
+      data-testid="roadmap-lessons"
+    >
+      {lessons.map((lesson) => (
+        <li
+          key={lesson.id}
+          className="rounded-xl bg-brand-light-gray/80 px-3 py-2.5"
+          data-testid="roadmap-lesson"
+        >
+          <div className="flex items-start justify-between gap-2">
+            <div className="min-w-0">
+              <p className="font-sans text-sm font-semibold text-brand-midnight">
+                {lesson.title}
+              </p>
+              <p className="mt-0.5 font-sans text-xs leading-relaxed text-muted-foreground">
+                {lesson.description}
+              </p>
+              <p className="mt-1 font-sans text-xs text-slate-500">
+                {lesson.readingTimeMinutes} min de leitura
+                {lesson.isFree ? ' · Grátis' : ''}
+              </p>
+            </div>
+            <a
+              href={lesson.url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex shrink-0 items-center gap-1 font-sans text-xs font-semibold text-brand-blue hover:underline"
+              data-testid="roadmap-lesson-link"
+            >
+              Abrir
+              <ExternalLink className="size-3.5" aria-hidden />
+            </a>
+          </div>
+        </li>
+      ))}
+    </ul>
+  );
+}
+
 function RoadmapNodeItem({ node }: { node: RoadmapNodeResponseDto }) {
   const [open, setOpen] = useState(false);
   const hasChildren = node.children.length > 0;
+  const lessons = node.lessons ?? [];
+  const showLessonsOnLeaf = !hasChildren && lessons.length > 0;
   const childrenId = `roadmap-children-${node.id}`;
 
   return (
@@ -106,12 +155,15 @@ function RoadmapNodeItem({ node }: { node: RoadmapNodeResponseDto }) {
         <RoadmapNodeHeading node={node} expandable={false} open={false} />
       )}
 
+      {showLessonsOnLeaf ? <RoadmapLessonList lessons={lessons} /> : null}
+
       {hasChildren && open ? (
         <ul
           id={childrenId}
           data-testid="roadmap-node-children"
           className="mt-3 flex flex-col gap-3 border-l-2 border-brand-blue/25 pl-3 sm:pl-5"
         >
+          <RoadmapLessonList lessons={lessons} />
           {node.children.map((child) => (
             <RoadmapNodeItem key={child.id} node={child} />
           ))}
