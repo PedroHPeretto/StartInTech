@@ -13,6 +13,9 @@ interface ImportMeta {
 
 interface Window {
   __STARTINTECH_E2E__?: boolean;
+  __STARTINTECH_ROUTER__?: {
+    navigate: (options: { to: string }) => Promise<void> | void;
+  };
   google?: {
     accounts: {
       id: {
