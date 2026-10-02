@@ -25,10 +25,14 @@ export class GcsStorageService {
 
   constructor(private readonly config: ConfigService) {
     this.storage = new Storage();
-    this.bucketName =
-      this.config.get<string>('GCS_PRIVATE_BUCKET') ??
-      process.env.GCS_PRIVATE_BUCKET ??
+    const bucket =
+      this.config.get<string>('GCS_PRIVATE_BUCKET')?.trim() ??
+      process.env.GCS_PRIVATE_BUCKET?.trim() ??
       '';
+    if (!bucket) {
+      throw new Error('GCS_PRIVATE_BUCKET configuration is required');
+    }
+    this.bucketName = bucket;
   }
 
   async createSignedUploadUrl(

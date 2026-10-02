@@ -163,6 +163,12 @@ export class ResumesService {
   }
 }
 
+/**
+ * Resolves the file extension ('pdf' | 'docx') for a supported resume MIME type.
+ *
+ * @param fileType - The MIME type of the uploaded file
+ * @returns The corresponding file extension
+ */
 export function fileExtensionForType(
   fileType: ResumeUploadFileType,
 ): 'pdf' | 'docx' {

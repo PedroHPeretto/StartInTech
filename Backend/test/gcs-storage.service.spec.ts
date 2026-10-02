@@ -65,4 +65,19 @@ describe('GcsStorageService', () => {
       expiresInSeconds: RESUME_UPLOAD_URL_EXPIRES_IN_SECONDS,
     });
   });
+
+  it('throws an error when GCS_PRIVATE_BUCKET is not configured', () => {
+    delete process.env.GCS_PRIVATE_BUCKET;
+    expect(() => new GcsStorageService(new ConfigService({}))).toThrow(
+      'GCS_PRIVATE_BUCKET configuration is required',
+    );
+  });
+
+  it('throws an error when GCS_PRIVATE_BUCKET is empty or whitespace', () => {
+    delete process.env.GCS_PRIVATE_BUCKET;
+    expect(
+      () =>
+        new GcsStorageService(new ConfigService({ GCS_PRIVATE_BUCKET: '   ' })),
+    ).toThrow('GCS_PRIVATE_BUCKET configuration is required');
+  });
 });

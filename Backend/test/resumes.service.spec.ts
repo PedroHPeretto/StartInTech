@@ -1,4 +1,4 @@
-import { BadRequestException } from '@nestjs/common';
+import { BadRequestException, ConflictException } from '@nestjs/common';
 import { ResumeSubmissionMode } from '@startintech/shared';
 import { describe, expect, it, vi } from 'vitest';
 import type { GcsStorageService } from '../src/resumes/gcs-storage.service.js';
@@ -16,6 +16,14 @@ class InMemoryResumesRepository implements ResumesRepository {
   readonly records: ResumeAnalysisRecord[] = [];
 
   create(params: CreateResumeAnalysisParams): Promise<ResumeAnalysisRecord> {
+    const existing = this.records.find((r) => r.id === params.id);
+    if (existing) {
+      return Promise.reject(
+        new ConflictException(
+          'Resume analysis already exists for this submission',
+        ),
+      );
+    }
     const record: ResumeAnalysisRecord = {
       id: params.id,
       userId: params.userId,
@@ -130,5 +138,24 @@ describe('ResumesService', () => {
       }),
     ).rejects.toBeInstanceOf(BadRequestException);
     expect(repository.records).toHaveLength(0);
+  });
+
+  it('rejects duplicate fileKey submission with ConflictException', async () => {
+    const repository = new InMemoryResumesRepository();
+    const gcs = createGcsMock();
+    const service = new ResumesService(repository, gcs);
+    const fileKey = `resumes/${AUTHENTICATED_USER_ID}/${ANALYSIS_ID}.pdf`;
+
+    await service.submit(AUTHENTICATED_USER_ID, {
+      mode: ResumeSubmissionMode.FILE_UPLOAD,
+      fileKey,
+    });
+
+    await expect(
+      service.submit(AUTHENTICATED_USER_ID, {
+        mode: ResumeSubmissionMode.FILE_UPLOAD,
+        fileKey,
+      }),
+    ).rejects.toBeInstanceOf(ConflictException);
   });
 });
