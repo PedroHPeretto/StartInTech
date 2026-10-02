@@ -1,4 +1,5 @@
 import {
+  type JobSortBy,
   type PaginatedJobsResponseDto,
   type WorkplaceType,
 } from '@startintech/shared';
@@ -9,6 +10,8 @@ export interface FetchJobsParams {
   limit?: number;
   workplaceType?: WorkplaceType;
   search?: string;
+  onlyHighCompatibility?: boolean;
+  sortBy?: JobSortBy;
 }
 
 export async function fetchJobs(
