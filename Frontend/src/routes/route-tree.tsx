@@ -6,6 +6,7 @@ import {
   redirect,
 } from '@tanstack/react-router';
 import { DashboardPage } from '@/pages/dashboard-page';
+import { CurriculumUploadPage } from '@/pages/curriculum-upload-page';
 import { LoginPage } from '@/pages/login-page';
 import { OnboardingPage } from '@/pages/onboarding-page';
 import type { RouterContext } from '@/routes/router-context';
@@ -69,11 +70,27 @@ const dashboardRoute = createRoute({
   component: DashboardPage,
 });
 
+const curriculumUploadRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/curriculum/upload',
+  beforeLoad: ({ context }) => {
+    const { auth } = context;
+    if (!auth.isAuthenticated) {
+      throw redirect({ to: '/login' });
+    }
+    if (!auth.isProfileComplete) {
+      throw redirect({ to: '/onboarding' });
+    }
+  },
+  component: CurriculumUploadPage,
+});
+
 const routeTree = rootRoute.addChildren([
   indexRoute,
   loginRoute,
   onboardingRoute,
   dashboardRoute,
+  curriculumUploadRoute,
 ]);
 
 export const router = createRouter({
