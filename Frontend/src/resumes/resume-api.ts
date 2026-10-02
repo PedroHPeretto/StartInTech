@@ -1,6 +1,7 @@
 import type {
   GenerateUploadUrlDto,
   ResumeSubmissionResponseDto,
+  SkillsExtractionResponseDto,
   SubmitResumeDto,
   UploadUrlResponseDto,
 } from '@startintech/shared';
@@ -26,6 +27,16 @@ export async function submitResume(
   const { data } = await apiClient.post<ResumeSubmissionResponseDto>(
     '/api/v1/resumes/submit',
     body,
+  );
+  return data;
+}
+
+export async function extractResumeSkills(
+  resumeId: string,
+): Promise<SkillsExtractionResponseDto> {
+  const { data } = await apiClient.post<SkillsExtractionResponseDto>(
+    `/api/v1/resumes/${resumeId}/extract-skills`,
+    {},
   );
   return data;
 }

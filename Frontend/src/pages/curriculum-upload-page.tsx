@@ -4,6 +4,7 @@ import {
   ResumeSubmissionMode,
 } from '@startintech/shared';
 import { FileText, UploadCloud } from 'lucide-react';
+import { Link } from '@tanstack/react-router';
 import { useMemo, useRef, useState } from 'react';
 import { BrandHeader } from '@/components/brand/brand-header';
 import { AlertBanner } from '@/components/feedback/alert-banner';
@@ -26,6 +27,9 @@ export function CurriculumUploadPage() {
   const [gcsRetryFile, setGcsRetryFile] = useState<File | null>(null);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [received, setReceived] = useState(false);
+  const [submittedResumeId, setSubmittedResumeId] = useState<string | null>(
+    null,
+  );
   const submitLock = useRef(false);
 
   const trimmedLength = rawText.trim().length;
@@ -51,6 +55,7 @@ export function CurriculumUploadPage() {
 
   const handleFileSelected = async (file: File) => {
     setReceived(false);
+    setSubmittedResumeId(null);
     setSubmitError(null);
     setGcsRetryFile(null);
     await uploadSelectedFile(file);
@@ -67,7 +72,8 @@ export function CurriculumUploadPage() {
     setGcsRetryFile(null);
 
     try {
-      await submitResumeFile(file, setUploadProgress);
+      const submission = await submitResumeFile(file, setUploadProgress);
+      setSubmittedResumeId(submission.id);
       setReceived(true);
     } catch (error) {
       const message =
@@ -102,12 +108,14 @@ export function CurriculumUploadPage() {
     setIsSubmittingText(true);
     setSubmitError(null);
     setReceived(false);
+    setSubmittedResumeId(null);
 
     try {
-      await submitResume({
+      const submission = await submitResume({
         mode: ResumeSubmissionMode.RAW_TEXT,
         rawText: rawText.trim(),
       });
+      setSubmittedResumeId(submission.id);
       setReceived(true);
     } catch {
       setSubmitError('Não foi possível enviar o texto. Tente novamente.');
@@ -141,8 +149,21 @@ export function CurriculumUploadPage() {
               Currículo recebido
             </h2>
             <p className="mt-2 font-sans text-sm text-slate-600">
-              Seu currículo foi recebido e está aguardando processamento.
+              Seu currículo foi recebido. Continue para extrair competências e
+              identificar gaps da sua trilha.
             </p>
+            {submittedResumeId ? (
+              <Link
+                to="/curriculum/analysis/$id"
+                params={{ id: submittedResumeId }}
+                className="mt-6 inline-flex"
+                data-testid="curriculum-analysis-link"
+              >
+                <span className="inline-flex h-9 items-center justify-center rounded-4xl bg-primary px-4 text-sm font-medium text-primary-foreground transition-all hover:bg-primary/80">
+                  Ir para análise de competências
+                </span>
+              </Link>
+            ) : null}
           </section>
         ) : (
           <div className="mt-8 space-y-6">
