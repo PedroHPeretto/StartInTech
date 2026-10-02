@@ -21,7 +21,14 @@ export default defineConfig({
   webServer: {
     command: "bun run dev",
     url: "http://localhost:5173",
-    reuseExistingServer: !process.env.CI,
+    reuseExistingServer: false,
     timeout: 120 * 1000,
+    env: {
+      ...process.env,
+      VITE_E2E: "true",
+      VITE_API_URL: process.env.VITE_API_URL ?? "http://localhost:3000",
+      VITE_GOOGLE_CLIENT_ID:
+        process.env.VITE_GOOGLE_CLIENT_ID ?? "e2e-google-client-id",
+    },
   },
 });
