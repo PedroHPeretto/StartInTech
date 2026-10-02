@@ -29,7 +29,7 @@ jobs:
           echo "PR title:      $PR_TITLE"
 
           # 1. Validate Branch Naming according to docs/GITFLOW.md
-          # Expected format: (feature|hotfix|chore)/<identificador>-<descricao-kebab>
+          # Expected format: (feature|hotfix|chore|fix)/<identificador>-<descricao-kebab>
           BRANCH_REGEX="^(feature|hotfix|chore|fix)\/[A-Za-z0-9]+-[a-z0-9-]+$"
           STACK_BRANCH_REGEX="^feat\/[a-z0-9-]+$"
 

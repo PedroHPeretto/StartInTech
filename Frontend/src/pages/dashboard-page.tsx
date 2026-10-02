@@ -5,7 +5,7 @@ export function DashboardPage() {
   const { profile } = useAuth();
 
   return (
-    <main className="flex min-h-screen items-center justify-center bg-brand-light-gray px-4">
+    <main className="flex flex-1 items-center justify-center bg-brand-blue px-4 py-10">
       <section className="w-full max-w-md rounded-2xl border border-border bg-background p-8 text-center shadow-sm">
         <h1 className="font-heading text-2xl font-bold text-brand-midnight">
           Dashboard
@@ -40,13 +40,22 @@ export function DashboardPage() {
             Área principal em construção.
           </p>
         )}
-        <Link
-          to="/roadmap"
-          data-testid="dashboard-roadmap-link"
-          className="mt-6 inline-flex h-9 items-center justify-center rounded-4xl bg-brand-blue px-4 font-sans text-sm font-semibold text-white transition-colors hover:bg-brand-blue/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-blue/40"
-        >
-          Ver trilha
-        </Link>
+        <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:justify-center">
+          <Link
+            to="/jobs"
+            data-testid="dashboard-jobs-link"
+            className="inline-flex h-9 items-center justify-center rounded-4xl bg-brand-blue px-4 font-sans text-sm font-semibold text-white transition-colors hover:bg-brand-blue/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-blue/40"
+          >
+            Ver vagas
+          </Link>
+          <Link
+            to="/roadmap"
+            data-testid="dashboard-roadmap-link"
+            className="inline-flex h-9 items-center justify-center rounded-4xl border border-brand-blue bg-white px-4 font-sans text-sm font-semibold text-brand-blue transition-colors hover:bg-brand-blue/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-blue/40"
+          >
+            Ver trilha
+          </Link>
+        </div>
       </section>
     </main>
   );

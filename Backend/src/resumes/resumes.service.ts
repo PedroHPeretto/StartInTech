@@ -36,6 +36,7 @@ import {
 } from './skill-name.util.js';
 import {
   RESUMES_REPOSITORY,
+  type LatestPresentSkillsResult,
   type ResumesRepository,
   type SkillLinkInput,
 } from './resumes.repository.js';
@@ -104,6 +105,12 @@ export class ResumesService {
       return this.submitRawText(userId, dto.rawText);
     }
     throw new BadRequestException('Invalid submission mode');
+  }
+
+  async findLatestPresentSkills(
+    userId: string,
+  ): Promise<LatestPresentSkillsResult> {
+    return this.resumes.findLatestPresentSkills(userId);
   }
 
   async extractSkills(

@@ -38,6 +38,7 @@ async function loginWithCompleteProfile(page: import('@playwright/test').Page) {
   await page.goto('/login');
   await page.getByTestId('google-login-button').click();
   await expect(page).toHaveURL(/\/dashboard$/);
+  await expect(page.getByTestId('app-shell')).toBeVisible();
 }
 
 async function openCurriculumAnalysis(page: import('@playwright/test').Page) {

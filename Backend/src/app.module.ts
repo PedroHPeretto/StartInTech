@@ -9,6 +9,7 @@ import { CareerTracksModule } from './career-tracks/career-tracks.module.js';
 import { dataSourceOptions } from './database/data-source.js';
 import { ProfilesModule } from './profiles/profiles.module.js';
 import { ResumesModule } from './resumes/resumes.module.js';
+import { JobsModule } from './jobs/jobs.module.js';
 import { RoadmapsModule } from './roadmaps/roadmaps.module.js';
 import { UsersModule } from './users/users.module.js';
 
@@ -54,6 +55,7 @@ import { UsersModule } from './users/users.module.js';
           ProfilesModule,
           RoadmapsModule,
           ResumesModule,
+          JobsModule,
         ]),
   ],
   controllers: [AppController],

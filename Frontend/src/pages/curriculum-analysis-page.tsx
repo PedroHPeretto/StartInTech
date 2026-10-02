@@ -99,7 +99,9 @@ function resolveExtractionError(error: unknown): {
 }
 
 export function CurriculumAnalysisPage() {
-  const { id: resumeId } = useParams({ from: '/curriculum/analysis/$id' });
+  const { id: resumeId } = useParams({
+    from: '/authenticated-layout/curriculum/analysis/$id',
+  });
   const [result, setResult] = useState<SkillsExtractionResponseDto | null>(
     null,
   );
@@ -124,7 +126,7 @@ export function CurriculumAnalysisPage() {
   }, [resumeId]);
 
   return (
-    <main className="min-h-screen bg-brand-light-gray px-4 py-10">
+    <main className="flex-1 bg-brand-light-gray px-4 py-10">
       <div className="mx-auto w-full max-w-4xl rounded-2xl border border-border bg-background p-6 shadow-sm sm:p-8">
         <div className="mb-8 flex justify-center">
           <BrandHeader href={undefined} showTagline />
