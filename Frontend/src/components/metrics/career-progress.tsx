@@ -1,24 +1,31 @@
 import { cn } from '@/lib/utils';
 
 export interface CareerProgressProps {
-  completedTopics: number;
-  totalTopics: number;
+  completedTopics?: number;
+  totalTopics?: number;
+  /** When set, displayed as-is (e.g. server-computed roadmap metrics). */
+  percentage?: number;
   title?: string;
   variant?: 'linear' | 'ring';
   className?: string;
+  showTopicSummary?: boolean;
 }
 
 export function CareerTrailProgress({
-  completedTopics,
-  totalTopics,
+  completedTopics = 0,
+  totalTopics = 0,
+  percentage: percentageOverride,
   title = 'Progresso na Trilha',
   variant = 'linear',
   className,
+  showTopicSummary = true,
 }: CareerProgressProps) {
   const percentage =
-    totalTopics > 0
-      ? Math.min(100, Math.round((completedTopics / totalTopics) * 100))
-      : 0;
+    percentageOverride !== undefined
+      ? Math.min(100, Math.max(0, percentageOverride))
+      : totalTopics > 0
+        ? Math.min(100, Math.round((completedTopics / totalTopics) * 100))
+        : 0;
 
   if (variant === 'ring') {
     const size = 80;
@@ -110,12 +117,14 @@ export function CareerTrailProgress({
         />
       </div>
 
-      <p className="text-xs font-sans text-slate-500">
-        Você completou{' '}
-        <span className="font-semibold text-slate-700">{completedTopics}</span>{' '}
-        de <span className="font-semibold text-slate-700">{totalTopics}</span>{' '}
-        tópicos essenciais
-      </p>
+      {showTopicSummary && totalTopics > 0 ? (
+        <p className="text-xs font-sans text-slate-500">
+          Você completou{' '}
+          <span className="font-semibold text-slate-700">{completedTopics}</span>{' '}
+          de <span className="font-semibold text-slate-700">{totalTopics}</span>{' '}
+          tópicos essenciais
+        </p>
+      ) : null}
     </div>
   );
 }
