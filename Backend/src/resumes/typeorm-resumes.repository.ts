@@ -54,9 +54,7 @@ export class TypeOrmResumesRepository implements ResumesRepository {
       const insertResult = await this.analyses.insert(entity as never);
       const rawCreatedAt =
         (insertResult.generatedMaps[0]?.createdAt as
-          | Date
-          | string
-          | undefined) ??
+          Date | string | undefined) ??
         (insertResult.raw[0]?.created_at as Date | string | undefined);
       const createdAt =
         rawCreatedAt instanceof Date
