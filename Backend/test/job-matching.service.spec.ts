@@ -57,9 +57,7 @@ describe('calculateJobMatch', () => {
     const requirements = Array.from({ length: 19 }, (_, index) =>
       requirement(`skill-${index}`, `Skill ${index}`, false),
     );
-    const present = new Set(
-      requirements.slice(0, 15).map((item) => item.id),
-    );
+    const present = new Set(requirements.slice(0, 15).map((item) => item.id));
 
     const result = calculateJobMatch(requirements, present);
 

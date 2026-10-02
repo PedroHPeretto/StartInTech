@@ -90,9 +90,9 @@ export class JobsService {
     enriched = this.sortListings(enriched, query.sortBy);
     const total = enriched.length;
     const start = (page - 1) * limit;
-    const pageItems = enriched.slice(start, start + limit).map(
-      ({ sortCreatedAt: _sortCreatedAt, ...listing }) => listing,
-    );
+    const pageItems = enriched
+      .slice(start, start + limit)
+      .map(({ sortCreatedAt: _sortCreatedAt, ...listing }) => listing);
 
     return this.toPaginatedResponse(pageItems, total, page, limit);
   }

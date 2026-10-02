@@ -77,7 +77,9 @@ class FakeJobsRepository implements JobsRepository {
     return Promise.resolve(this.cachedCount);
   }
 
-  findAllForListing(_params: ListJobsFilterParams): Promise<JobListingRecord[]> {
+  findAllForListing(
+    _params: ListJobsFilterParams,
+  ): Promise<JobListingRecord[]> {
     this.findAllCalls += 1;
     const next = this.sequences.shift();
     return Promise.resolve(next ?? []);
@@ -179,7 +181,10 @@ describe('JobsService', () => {
 
   it('calls Adzuna on cache miss, upserts listings, and re-queries', async () => {
     const repository = new FakeJobsRepository(
-      [[jobRecord('job-1', 'Junior Dev')], [jobRecord('job-2', 'Frontend Dev')]],
+      [
+        [jobRecord('job-1', 'Junior Dev')],
+        [jobRecord('job-2', 'Frontend Dev')],
+      ],
       15,
     );
     const adzuna = new FakeAdzunaAdapter();
@@ -276,7 +281,9 @@ describe('JobsService', () => {
     const repository = new FakeJobsRepository([
       [
         jobRecord('seal', 'Seal Job', {
-          requirements: [{ id: skillMandatory, name: 'Core', isMandatory: true }],
+          requirements: [
+            { id: skillMandatory, name: 'Core', isMandatory: true },
+          ],
         }),
         jobRecord('no-seal', 'No Seal Job', {
           requirements: [

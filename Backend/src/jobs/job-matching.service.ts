@@ -15,7 +15,9 @@ export function calculateJobMatch(
     };
   }
 
-  const hasMandatory = requirements.some((requirement) => requirement.isMandatory);
+  const hasMandatory = requirements.some(
+    (requirement) => requirement.isMandatory,
+  );
   const skillWeight = (requirement: JobSkillRequirement): number => {
     if (!hasMandatory) {
       return 1;

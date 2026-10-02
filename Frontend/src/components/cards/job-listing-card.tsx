@@ -30,8 +30,7 @@ export function JobListingCard({ job, className }: JobListingCardProps) {
     match !== null &&
     (match.matchedSkills.length > 0 || match.missingSkills.length > 0);
   const showMatchExpandable = match !== null && hasMatchBreakdown;
-  const showRequirementsList =
-    match === null && job.requirements.length > 0;
+  const showRequirementsList = match === null && job.requirements.length > 0;
 
   return (
     <article
@@ -184,11 +183,7 @@ export function JobListingCard({ job, className }: JobListingCardProps) {
           </p>
           <div className="flex flex-wrap gap-2">
             {job.requirements.map((skill) => (
-              <GapSkillBadge
-                key={skill.id}
-                skillName={skill.name}
-                type="gap"
-              />
+              <GapSkillBadge key={skill.id} skillName={skill.name} type="gap" />
             ))}
           </div>
         </div>
