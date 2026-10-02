@@ -1,3 +1,4 @@
+import type { FeedbackReportDto } from '@startintech/shared';
 import {
   Column,
   CreateDateColumn,
@@ -27,7 +28,7 @@ export class ResumeAnalysis {
   atsScore!: number | null;
 
   @Column({ name: 'feedback_report', type: 'jsonb', nullable: true })
-  feedbackReport!: Record<string, unknown> | null;
+  feedbackReport!: FeedbackReportDto | null;
 
   @CreateDateColumn({ name: 'created_at', type: 'timestamptz' })
   createdAt!: Date;

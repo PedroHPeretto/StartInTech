@@ -80,4 +80,9 @@ export class GcsStorageService {
     const [contents] = await file.download();
     return contents;
   }
+
+  async deleteObject(fileKey: string): Promise<void> {
+    const file = this.storage.bucket(this.bucketName).file(fileKey);
+    await file.delete({ ignoreNotFound: true });
+  }
 }

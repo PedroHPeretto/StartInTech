@@ -1,6 +1,7 @@
 import {
   Body,
   Controller,
+  Get,
   HttpCode,
   Param,
   Post,
@@ -8,6 +9,8 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import type {
+  ResumeEvaluationResponseDto,
+  ResumeHistoryItemDto,
   ResumeSubmissionResponseDto,
   SkillsExtractionResponseDto,
   UploadUrlResponseDto,
@@ -47,6 +50,14 @@ export class ResumesController {
     return this.resumesService.submit(request.user.userId, body);
   }
 
+  @Get('history')
+  @UseGuards(JwtAuthGuard)
+  getHistory(
+    @Req() request: AuthenticatedRequest,
+  ): Promise<ResumeHistoryItemDto[]> {
+    return this.resumesService.getHistory(request.user.userId);
+  }
+
   @Post(':id/extract-skills')
   @HttpCode(200)
   @UseGuards(JwtAuthGuard)
@@ -55,5 +66,15 @@ export class ResumesController {
     @Param('id') resumeId: string,
   ): Promise<SkillsExtractionResponseDto> {
     return this.resumesService.extractSkills(request.user.userId, resumeId);
+  }
+
+  @Post(':id/evaluate')
+  @HttpCode(200)
+  @UseGuards(JwtAuthGuard)
+  evaluate(
+    @Req() request: AuthenticatedRequest,
+    @Param('id') resumeId: string,
+  ): Promise<ResumeEvaluationResponseDto> {
+    return this.resumesService.evaluate(request.user.userId, resumeId);
   }
 }

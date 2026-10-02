@@ -1,7 +1,12 @@
-import { SkillCategory } from '@startintech/shared';
+import {
+  SeniorityLevel,
+  SkillCategory,
+  type FeedbackReportDto,
+} from '@startintech/shared';
 import { BadGatewayException, Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import * as Sentry from '@sentry/nestjs';
+import { OPENROUTER_FEEDBACK_JSON_SCHEMA } from './openrouter-feedback.schema.js';
 import { OPENROUTER_SKILL_EXTRACTION_JSON_SCHEMA } from './openrouter-skill-extraction.schema.js';
 
 const OPENROUTER_CHAT_URL = 'https://openrouter.ai/api/v1/chat/completions';
@@ -23,6 +28,13 @@ export interface AiSkillExtractionResult {
   detectedSkills: RawExtractedSkill[];
   missingSkills: RawExtractedSkill[];
   insufficientText: boolean;
+}
+
+export interface PedagogicalFeedbackContext {
+  career: CareerContextForExtraction;
+  resumeText: string;
+  presentSkills: string[];
+  missingSkills: string[];
 }
 
 export type FetchFn = typeof fetch;
@@ -129,6 +141,100 @@ export class AiService {
     );
   }
 
+  async generatePedagogicalFeedback(
+    context: PedagogicalFeedbackContext,
+  ): Promise<FeedbackReportDto> {
+    const apiKey =
+      this.config.get<string>('OPENROUTER_API_KEY') ??
+      process.env.OPENROUTER_API_KEY;
+    if (!apiKey?.trim()) {
+      this.reportFeedbackGateway(
+        new Error('OPENROUTER_API_KEY is not configured'),
+      );
+    }
+
+    const model =
+      this.config.get<string>('OPENROUTER_MODEL') ??
+      process.env.OPENROUTER_MODEL ??
+      DEFAULT_OPENROUTER_MODEL;
+
+    const body = {
+      model,
+      messages: [
+        {
+          role: 'system',
+          content: [
+            'You provide constructive, pedagogical resume feedback for early-career candidates.',
+            'Return structured JSON only.',
+            'Do not include numeric scores or percentages.',
+            'marketReadiness must be INTERNSHIP or JUNIOR only.',
+          ].join(' '),
+        },
+        {
+          role: 'user',
+          content: [
+            `Career track: ${context.career.name} (${context.career.slug})`,
+            `Career description: ${context.career.description}`,
+            `Present skills: ${context.presentSkills.join(', ') || 'none'}`,
+            `Missing skills: ${context.missingSkills.join(', ') || 'none'}`,
+            'Resume text:',
+            context.resumeText,
+          ].join('\n\n'),
+        },
+      ],
+      response_format: {
+        type: 'json_schema',
+        json_schema: OPENROUTER_FEEDBACK_JSON_SCHEMA,
+      },
+    };
+
+    for (let attempt = 0; attempt < 2; attempt += 1) {
+      try {
+        const response = await this.fetchImpl(OPENROUTER_CHAT_URL, {
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${apiKey}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(body),
+          signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+        });
+
+        if (response.status === 500 && attempt === 0) {
+          await delay(1_000);
+          continue;
+        }
+
+        if (!response.ok) {
+          this.reportFeedbackGateway(
+            new Error(`OpenRouter responded with status ${response.status}`),
+          );
+        }
+
+        const payload = (await response.json()) as {
+          choices?: Array<{ message?: { content?: string } }>;
+        };
+        const content = payload.choices?.[0]?.message?.content;
+        if (!content) {
+          this.reportFeedbackGateway(
+            new Error('OpenRouter response missing message content'),
+          );
+        }
+
+        return this.parseFeedbackContent(content);
+      } catch (error) {
+        if (error instanceof BadGatewayException) {
+          throw error;
+        }
+        this.reportFeedbackGateway(error);
+      }
+    }
+
+    this.reportFeedbackGateway(
+      new Error('OpenRouter request failed after retry'),
+    );
+  }
+
   private parseModelContent(content: string): AiSkillExtractionResult {
     let parsed: unknown;
     try {
@@ -158,9 +264,50 @@ export class AiService {
     };
   }
 
+  private parseFeedbackContent(content: string): FeedbackReportDto {
+    let parsed: unknown;
+    try {
+      parsed = JSON.parse(content);
+    } catch (error) {
+      this.reportFeedbackGateway(error);
+    }
+
+    const record = parsed as {
+      summary?: string;
+      strengths?: string[];
+      improvements?: string[];
+      actionPlan?: string[];
+      marketReadiness?: SeniorityLevel;
+    };
+
+    if (
+      typeof record.summary !== 'string' ||
+      !Array.isArray(record.strengths) ||
+      !Array.isArray(record.improvements) ||
+      !Array.isArray(record.actionPlan) ||
+      (record.marketReadiness !== SeniorityLevel.INTERNSHIP &&
+        record.marketReadiness !== SeniorityLevel.JUNIOR)
+    ) {
+      this.reportFeedbackGateway(new Error('OpenRouter JSON schema mismatch'));
+    }
+
+    return {
+      summary: record.summary,
+      strengths: record.strengths,
+      improvements: record.improvements,
+      actionPlan: record.actionPlan,
+      marketReadiness: record.marketReadiness,
+    };
+  }
+
   private reportAndThrowGateway(error: unknown): never {
     Sentry.captureException(error);
     throw new BadGatewayException('Skill extraction provider unavailable');
+  }
+
+  private reportFeedbackGateway(error: unknown): never {
+    Sentry.captureException(error);
+    throw new BadGatewayException('Resume feedback provider unavailable');
   }
 }
 

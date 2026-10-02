@@ -5,6 +5,8 @@ import {
   ResumeAnalysisSkillStatus,
   ResumeSubmissionMode,
   type GenerateUploadUrlDto,
+  type ResumeEvaluationResponseDto,
+  type ResumeHistoryItemDto,
   type ResumeSubmissionResponseDto,
   type ResumeUploadFileType,
   type SkillsExtractionResponseDto,
@@ -15,12 +17,15 @@ import { randomUUID } from 'node:crypto';
 import {
   BadGatewayException,
   BadRequestException,
+  ConflictException,
   Inject,
   Injectable,
   NotFoundException,
   UnprocessableEntityException,
 } from '@nestjs/common';
+import * as Sentry from '@sentry/nestjs';
 import { AiService } from '../ai/ai.service.js';
+import { AtsScoringService } from './ats-scoring.service.js';
 import {
   PROFILES_REPOSITORY,
   type ProfilesRepository,
@@ -56,6 +61,7 @@ export class ResumesService {
     private readonly profiles: ProfilesRepository,
     private readonly gcs: GcsStorageService,
     private readonly ai: AiService,
+    private readonly atsScoring: AtsScoringService,
   ) {}
 
   async generateUploadUrl(
@@ -255,14 +261,16 @@ export class ResumesService {
       throw new NotFoundException('Uploaded file not found');
     }
 
-    const created = await this.resumes.create({
+    const { record, purgedFileUrls } = await this.resumes.create({
       id: analysisId,
       userId,
       fileUrl: this.gcs.buildFileUrl(fileKey),
       rawText: null,
     });
 
-    return this.toSubmissionResponse(created);
+    await this.purgeStorageUrls(purgedFileUrls);
+
+    return this.toSubmissionResponse(record);
   }
 
   private async submitRawText(
@@ -277,14 +285,111 @@ export class ResumesService {
       throw new BadRequestException('Raw text is too long');
     }
 
-    const created = await this.resumes.create({
+    const { record, purgedFileUrls } = await this.resumes.create({
       id: randomUUID(),
       userId,
       fileUrl: null,
       rawText: trimmed,
     });
 
-    return this.toSubmissionResponse(created);
+    await this.purgeStorageUrls(purgedFileUrls);
+
+    return this.toSubmissionResponse(record);
+  }
+
+  async getHistory(userId: string): Promise<ResumeHistoryItemDto[]> {
+    return this.resumes.listHistoryForUser(userId);
+  }
+
+  async evaluate(
+    userId: string,
+    resumeId: string,
+  ): Promise<ResumeEvaluationResponseDto> {
+    await this.retryPendingStoragePurges();
+
+    const analysis = await this.resumes.findForEvaluation(resumeId, userId);
+    if (!analysis) {
+      throw new NotFoundException('Resume analysis not found');
+    }
+
+    const activeVersionsCount = (
+      await this.resumes.listHistoryForUser(userId)
+    ).length;
+
+    if (
+      analysis.atsScore !== null &&
+      analysis.atsScore !== undefined &&
+      analysis.feedbackReport
+    ) {
+      return {
+        id: analysis.id,
+        atsScore: analysis.atsScore,
+        report: analysis.feedbackReport,
+        createdAt: analysis.createdAt.toISOString(),
+        activeVersionsCount,
+      };
+    }
+
+    if (analysis.presentSkillCount + analysis.missingSkillCount === 0) {
+      throw new ConflictException(
+        'Extract skills before evaluating this resume',
+      );
+    }
+
+    const profile = await this.profiles.findByUserId(userId);
+    if (!profile) {
+      throw new UnprocessableEntityException(
+        'Complete your profile before analyzing',
+      );
+    }
+
+    const careerTrack = await this.profiles.findCareerTrackById(
+      profile.careerTrack.id,
+    );
+    if (!careerTrack) {
+      throw new UnprocessableEntityException('Career track not found');
+    }
+
+    const resumeText = await this.resolveResumeText(analysis);
+    const trimmedText = resumeText.trim();
+    if (trimmedText.length < RESUME_RAW_TEXT_MIN_LENGTH) {
+      throw new UnprocessableEntityException(
+        'Resume text is too short to analyze',
+      );
+    }
+
+    const atsScore = this.atsScoring.computeAtsScore({
+      presentSkillCount: analysis.presentSkillCount,
+      missingSkillCount: analysis.missingSkillCount,
+      resumeText: trimmedText,
+    });
+
+    const report = await this.ai.generatePedagogicalFeedback({
+      career: {
+        name: careerTrack.name,
+        slug: careerTrack.slug,
+        description: careerTrack.description,
+      },
+      resumeText: trimmedText,
+      presentSkills: analysis.presentSkillNames,
+      missingSkills: analysis.missingSkillNames,
+    });
+
+    const { activeVersionsCount: countAfterPersist } =
+      await this.resumes.persistEvaluation({
+        analysisId: resumeId,
+        userId,
+        atsScore,
+        feedbackReport: report,
+      });
+
+    return {
+      id: analysis.id,
+      atsScore,
+      report,
+      createdAt: analysis.createdAt.toISOString(),
+      activeVersionsCount: countAfterPersist,
+    };
   }
 
   private toSubmissionResponse(record: {
@@ -298,6 +403,36 @@ export class ResumesService {
       status: 'RECEIVED',
       createdAt: record.createdAt.toISOString(),
     };
+  }
+
+  private async purgeStorageUrls(fileUrls: string[]): Promise<void> {
+    await this.retryPendingStoragePurges();
+    for (const fileUrl of fileUrls) {
+      await this.tryDeleteStorageObject(fileUrl);
+    }
+  }
+
+  private async retryPendingStoragePurges(): Promise<void> {
+    const pending = await this.resumes.listPendingStoragePurges();
+    for (const row of pending) {
+      try {
+        const fileKey = this.gcs.parseFileKeyFromGsUrl(row.fileUrl);
+        await this.gcs.deleteObject(fileKey);
+        await this.resumes.deletePendingStoragePurge(row.id);
+      } catch (error) {
+        Sentry.captureException(error);
+      }
+    }
+  }
+
+  private async tryDeleteStorageObject(fileUrl: string): Promise<void> {
+    try {
+      const fileKey = this.gcs.parseFileKeyFromGsUrl(fileUrl);
+      await this.gcs.deleteObject(fileKey);
+    } catch (error) {
+      Sentry.captureException(error);
+      await this.resumes.recordPendingStoragePurge(fileUrl);
+    }
   }
 }
 
