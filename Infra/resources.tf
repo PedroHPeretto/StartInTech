@@ -64,7 +64,7 @@ resource "google_storage_bucket" "private_storage" {
   cors {
     origin          = var.spa_origins
     method          = ["GET", "PUT", "POST", "OPTIONS"]
-    response_header = ["Content-Type", "x-goog-resumable"]
+    response_header = ["Content-Type", "x-goog-resumable", "x-goog-content-length-range"]
     max_age_seconds = 3600
   }
 
