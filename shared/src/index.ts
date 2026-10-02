@@ -115,6 +115,36 @@ export interface CareerTrackDto {
   description?: string;
 }
 
+export interface CreateProfileDto {
+  fullName: string;
+  careerTrackId: string;
+  seniorityLevel: SeniorityLevel;
+  bio?: string | null;
+}
+
+export interface CareerTrackResponseDto {
+  id: string;
+  slug: string;
+  name: string;
+  description: string;
+}
+
+export interface CareerTrackSummaryDto {
+  id: string;
+  name: string;
+  slug: string;
+}
+
+export interface ProfileResponseDto {
+  id: string;
+  userId: string;
+  fullName: string;
+  seniorityLevel: SeniorityLevel;
+  bio: string | null;
+  careerTrack: CareerTrackSummaryDto;
+  isProfileComplete: true;
+}
+
 export interface SkillDto {
   id: string;
   name: string;
