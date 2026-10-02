@@ -18,6 +18,7 @@ import { normalizeSkillNameKey, sanitizeSkillName } from './skill-name.util.js';
 import { Skill } from './skill.entity.js';
 import type {
   CreateResumeAnalysisParams,
+  LatestPresentSkillsResult,
   PersistedSkillExtraction,
   ResumeAnalysisRecord,
   ResumesRepository,
@@ -80,6 +81,44 @@ export class TypeOrmResumesRepository implements ResumesRepository {
     }
   }
 
+  async findLatestPresentSkills(
+    userId: string,
+  ): Promise<LatestPresentSkillsResult> {
+    const rows = await this.dataSource.query<
+      Array<{ analysis_id: string | null; skill_id: string | null }>
+    >(
+      `
+        WITH latest AS (
+          SELECT ra.id
+          FROM resume_analyses ra
+          INNER JOIN users u ON u.id = ra.user_id
+          WHERE u.id = $1
+          ORDER BY ra.created_at DESC
+          LIMIT 1
+        )
+        SELECT latest.id AS analysis_id, ras.skill_id
+        FROM latest
+        LEFT JOIN resume_analysis_skills ras
+          ON ras.resume_analysis_id = latest.id
+          AND ras.status = $2
+      `,
+      [userId, ResumeAnalysisSkillStatus.PRESENT],
+    );
+
+    if (rows.length === 0 || rows[0]?.analysis_id === null) {
+      return { hasResumeAnalyzed: false, presentSkillIds: [] };
+    }
+
+    const presentSkillIds = rows
+      .map((row) => row.skill_id)
+      .filter((skillId): skillId is string => skillId !== null);
+
+    return {
+      hasResumeAnalyzed: true,
+      presentSkillIds,
+    };
+  }
+
   async findByIdForUser(
     id: string,
     userId: string,
@@ -102,6 +141,39 @@ export class TypeOrmResumesRepository implements ResumesRepository {
       rawText: analysis.rawText,
       createdAt: analysis.createdAt,
     };
+  }
+
+  async findLatestPresentSkills(
+    userId: string,
+  ): Promise<LatestPresentSkillsResult> {
+    const rows: Array<{ skill_id: string | null }> = await this.dataSource.query(
+      `
+        WITH latest AS (
+          SELECT ra.id
+          FROM resume_analyses ra
+          INNER JOIN users u ON u.id = ra.user_id
+          WHERE u.id = $1
+          ORDER BY ra.created_at DESC
+          LIMIT 1
+        )
+        SELECT ras.skill_id
+        FROM latest l
+        LEFT JOIN resume_analysis_skills ras
+          ON ras.resume_analysis_id = l.id
+         AND ras.status = 'PRESENT'
+      `,
+      [userId],
+    );
+
+    if (rows.length === 0) {
+      return { hasResumeAnalyzed: false, presentSkillIds: [] };
+    }
+
+    const presentSkillIds = rows
+      .map((row) => row.skill_id)
+      .filter((skillId): skillId is string => skillId !== null);
+
+    return { hasResumeAnalyzed: true, presentSkillIds };
   }
 
   async persistSkillExtraction(

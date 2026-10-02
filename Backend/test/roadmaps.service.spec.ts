@@ -1,5 +1,6 @@
 import { NotFoundException } from '@nestjs/common';
 import {
+  DynamicRoadmapNodeStatus,
   SeniorityLevel,
   SkillPriority,
   type RoadmapNodeResponseDto,
@@ -15,6 +16,8 @@ import type {
   RoadmapNodeRecord,
   RoadmapsRepository,
 } from '../src/roadmaps/roadmaps.repository.js';
+import type { LatestPresentSkillsResult } from '../src/resumes/resumes.repository.js';
+import { ResumesService } from '../src/resumes/resumes.service.js';
 import { RoadmapsService } from '../src/roadmaps/roadmaps.service.js';
 
 const USER_ID = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
@@ -58,12 +61,41 @@ function profilesService(profile: ProfileRecord | null): ProfilesService {
   return new ProfilesService(repository);
 }
 
+function resumesService(
+  result: LatestPresentSkillsResult = {
+    hasResumeAnalyzed: false,
+    presentSkillIds: [],
+  },
+): ResumesService {
+  return {
+    findLatestPresentSkills: () => Promise.resolve(result),
+  } as ResumesService;
+}
+
+function roadmapsService(
+  profile: ProfileRecord | null,
+  roadmap: CareerRoadmapRecord | null,
+  latestSkills: LatestPresentSkillsResult = {
+    hasResumeAnalyzed: false,
+    presentSkillIds: [],
+  },
+): { service: RoadmapsService; repository: FakeRoadmapsRepository } {
+  const repository = new FakeRoadmapsRepository(roadmap);
+  const service = new RoadmapsService(
+    profilesService(profile),
+    resumesService(latestSkills),
+    repository,
+  );
+  return { service, repository };
+}
+
 function node(
   id: string,
   parentNodeId: string | null,
   sequenceOrder: number,
   priority: SkillPriority,
   title: string,
+  skillId: string | null = null,
 ): RoadmapNodeRecord {
   return {
     id,
@@ -72,7 +104,7 @@ function node(
     priority,
     title,
     description: null,
-    skillId: null,
+    skillId,
   };
 }
 
@@ -109,7 +141,7 @@ function hasEdge(
 
 describe('RoadmapsService', () => {
   it('nests flat nodes more than one level deep for the profile career', async () => {
-    const repository = new FakeRoadmapsRepository({
+    const roadmap: CareerRoadmapRecord = {
       id: 'roadmap-1',
       title: 'Trilha de Desenvolvimento de Software',
       description: 'Da lógica até a primeira aplicação web',
@@ -124,8 +156,8 @@ describe('RoadmapsService', () => {
           'Estruturas de dados',
         ),
       ],
-    });
-    const service = new RoadmapsService(profilesService(PROFILE), repository);
+    };
+    const { service, repository } = roadmapsService(PROFILE, roadmap);
 
     const result = await service.getMyTrack(USER_ID);
 
@@ -170,7 +202,7 @@ describe('RoadmapsService', () => {
   });
 
   it('orders siblings by sequence and breaks ties with priority', async () => {
-    const repository = new FakeRoadmapsRepository({
+    const roadmap: CareerRoadmapRecord = {
       id: 'roadmap-1',
       title: 'Trilha',
       description: null,
@@ -199,8 +231,8 @@ describe('RoadmapsService', () => {
         ),
         node('first', 'root', 1, SkillPriority.ADVANCED, 'First'),
       ],
-    });
-    const service = new RoadmapsService(profilesService(PROFILE), repository);
+    };
+    const { service } = roadmapsService(PROFILE, roadmap);
 
     const result = await service.getMyTrack(USER_ID);
 
@@ -213,7 +245,7 @@ describe('RoadmapsService', () => {
   });
 
   it('places a node whose parent is missing at the root', async () => {
-    const repository = new FakeRoadmapsRepository({
+    const roadmap: CareerRoadmapRecord = {
       id: 'roadmap-1',
       title: 'Trilha',
       description: null,
@@ -227,8 +259,8 @@ describe('RoadmapsService', () => {
           'Orphan',
         ),
       ],
-    });
-    const service = new RoadmapsService(profilesService(PROFILE), repository);
+    };
+    const { service } = roadmapsService(PROFILE, roadmap);
 
     const result = await service.getMyTrack(USER_ID);
 
@@ -238,7 +270,7 @@ describe('RoadmapsService', () => {
   });
 
   it('returns when a parent reference is circular', async () => {
-    const repository = new FakeRoadmapsRepository({
+    const roadmap: CareerRoadmapRecord = {
       id: 'roadmap-1',
       title: 'Trilha',
       description: null,
@@ -246,8 +278,8 @@ describe('RoadmapsService', () => {
         node('node-a', 'node-b', 1, SkillPriority.ESSENTIAL, 'A'),
         node('node-b', 'node-a', 2, SkillPriority.RECOMMENDED, 'B'),
       ],
-    });
-    const service = new RoadmapsService(profilesService(PROFILE), repository);
+    };
+    const { service } = roadmapsService(PROFILE, roadmap);
 
     const result = await service.getMyTrack(USER_ID);
     const ids = collectIds(result.nodes);
@@ -261,8 +293,7 @@ describe('RoadmapsService', () => {
   });
 
   it('throws not found when the user has no profile', async () => {
-    const repository = new FakeRoadmapsRepository(null);
-    const service = new RoadmapsService(profilesService(null), repository);
+    const { service, repository } = roadmapsService(null, null);
 
     await expect(service.getMyTrack(USER_ID)).rejects.toThrow(
       new NotFoundException('Profile not found'),
@@ -271,8 +302,7 @@ describe('RoadmapsService', () => {
   });
 
   it('throws not found when the career has no roadmap', async () => {
-    const repository = new FakeRoadmapsRepository(null);
-    const service = new RoadmapsService(profilesService(PROFILE), repository);
+    const { service } = roadmapsService(PROFILE, null);
 
     await expect(service.getMyTrack(USER_ID)).rejects.toThrow(
       new NotFoundException('Career roadmap not found'),
@@ -280,7 +310,7 @@ describe('RoadmapsService', () => {
   });
 
   it('loads roadmap nodes in a single repository read', async () => {
-    const repository = new FakeRoadmapsRepository({
+    const roadmap: CareerRoadmapRecord = {
       id: 'roadmap-1',
       title: 'Trilha',
       description: null,
@@ -290,11 +320,102 @@ describe('RoadmapsService', () => {
         node('child-b', 'root', 2, SkillPriority.RECOMMENDED, 'Child B'),
         node('grandchild', 'child-a', 1, SkillPriority.ADVANCED, 'Grandchild'),
       ],
-    });
-    const service = new RoadmapsService(profilesService(PROFILE), repository);
+    };
+    const { service, repository } = roadmapsService(PROFILE, roadmap);
 
     await service.getMyTrack(USER_ID);
 
     expect(repository.calls).toBe(1);
+  });
+
+  describe('getMyTrackProgress', () => {
+    const SKILL_A = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaa0001';
+    const SKILL_B = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbb001';
+
+    const progressRoadmap: CareerRoadmapRecord = {
+      id: 'roadmap-progress',
+      title: 'Trilha com progresso',
+      description: null,
+      nodes: [
+        node('group', null, 1, SkillPriority.ESSENTIAL, 'Grupo', null),
+        node(
+          'skill-essential',
+          'group',
+          1,
+          SkillPriority.ESSENTIAL,
+          'Essencial',
+          SKILL_A,
+        ),
+        node(
+          'skill-recommended',
+          'group',
+          2,
+          SkillPriority.RECOMMENDED,
+          'Recomendado',
+          SKILL_B,
+        ),
+      ],
+    };
+
+    it('marks present skills as MASTERED', async () => {
+      const { service } = roadmapsService(PROFILE, progressRoadmap, {
+        hasResumeAnalyzed: true,
+        presentSkillIds: [SKILL_A],
+      });
+
+      const result = await service.getMyTrackProgress(USER_ID);
+
+      expect(result.hasResumeAnalyzed).toBe(true);
+      expect(result.nodes[0]?.status).toBe(DynamicRoadmapNodeStatus.NEUTRAL);
+      expect(result.nodes[0]?.children[0]?.status).toBe(
+        DynamicRoadmapNodeStatus.MASTERED,
+      );
+      expect(result.nodes[0]?.children[1]?.status).toBe(
+        DynamicRoadmapNodeStatus.PENDING,
+      );
+    });
+
+    it('returns pending nodes and zero metrics when there is no analysis', async () => {
+      const { service } = roadmapsService(PROFILE, progressRoadmap);
+
+      const result = await service.getMyTrackProgress(USER_ID);
+
+      expect(result.hasResumeAnalyzed).toBe(false);
+      expect(result.metrics).toEqual({
+        totalTrackableNodes: 2,
+        masteredNodesCount: 0,
+        overallProgressPercentage: 0,
+        essentialProgressPercentage: 0,
+      });
+      expect(result.nodes[0]?.children[0]?.status).toBe(
+        DynamicRoadmapNodeStatus.PENDING,
+      );
+      expect(result.nodes[0]?.status).toBe(DynamicRoadmapNodeStatus.NEUTRAL);
+    });
+
+    it('excludes neutral nodes from progress denominators', async () => {
+      const { service } = roadmapsService(PROFILE, progressRoadmap, {
+        hasResumeAnalyzed: true,
+        presentSkillIds: [SKILL_A, SKILL_B],
+      });
+
+      const result = await service.getMyTrackProgress(USER_ID);
+
+      expect(result.metrics.totalTrackableNodes).toBe(2);
+      expect(result.nodes[0]?.status).toBe(DynamicRoadmapNodeStatus.NEUTRAL);
+    });
+
+    it('computes overall and essential percentages on a fixed tree', async () => {
+      const { service } = roadmapsService(PROFILE, progressRoadmap, {
+        hasResumeAnalyzed: true,
+        presentSkillIds: [SKILL_A],
+      });
+
+      const result = await service.getMyTrackProgress(USER_ID);
+
+      expect(result.metrics.overallProgressPercentage).toBe(50);
+      expect(result.metrics.essentialProgressPercentage).toBe(100);
+      expect(result.metrics.masteredNodesCount).toBe(1);
+    });
   });
 });
