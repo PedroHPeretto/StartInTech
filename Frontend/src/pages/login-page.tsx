@@ -59,6 +59,9 @@ export function LoginPage() {
       return;
     }
 
+    const container = gsiContainerRef.current;
+    container.replaceChildren();
+
     google.accounts.id.initialize({
       client_id: clientId,
       callback: (credentialResponse) => {
@@ -69,11 +72,13 @@ export function LoginPage() {
       },
     });
 
-    google.accounts.id.renderButton(gsiContainerRef.current, {
+    google.accounts.id.renderButton(container, {
       type: 'standard',
       theme: 'outline',
       size: 'large',
-      width: gsiContainerRef.current.offsetWidth || 320,
+      width: container.offsetWidth || 320,
+      text: 'continue_with',
+      locale: 'pt-BR',
     });
   }, [clientId, scriptLoadedSuccessfully, handleCredential, isE2E]);
 
@@ -82,19 +87,19 @@ export function LoginPage() {
   };
 
   const googleButtonClassName =
-    'w-full gap-2 bg-white text-brand-midnight hover:bg-white/90';
+    'w-full gap-2 border border-slate-200 bg-white text-brand-midnight shadow-sm hover:bg-slate-50';
 
   return (
     <div className="flex min-h-screen flex-col items-center justify-center bg-brand-blue px-4">
-      <div className="w-full max-w-md">
+      <div className="w-full max-w-md rounded-3xl bg-white px-8 py-10 shadow-xl sm:px-10">
         <div className="mb-8 flex justify-center">
-          <BrandHeader href={undefined} showTagline theme="dark" />
+          <BrandHeader href={undefined} showTagline />
         </div>
 
-        <h1 className="font-heading text-center text-2xl font-bold text-white">
+        <h1 className="font-heading text-center text-2xl font-bold text-brand-midnight">
           Entrar na StartInTech
         </h1>
-        <p className="mt-2 text-center text-sm text-white/80">
+        <p className="mt-2 text-center text-sm text-slate-500">
           Use sua conta Google para continuar.
         </p>
 
@@ -112,28 +117,38 @@ export function LoginPage() {
               Continuar com Google
             </Button>
           ) : (
-            <div className="relative w-full">
-              <Button
-                type="button"
-                size="lg"
-                className={`pointer-events-none ${googleButtonClassName}`}
-                disabled={isSubmitting || !scriptLoadedSuccessfully}
-                data-testid="google-login-button"
-              >
-                <img src={googleIcon} alt="" className="size-5" aria-hidden />
-                {isSubmitting ? 'Entrando…' : 'Continuar com Google'}
-              </Button>
+            <div className="w-full">
+              {!scriptLoadedSuccessfully || !clientId || isSubmitting ? (
+                <Button
+                  type="button"
+                  size="lg"
+                  className={googleButtonClassName}
+                  disabled
+                  data-testid="google-login-button"
+                >
+                  <img src={googleIcon} alt="" className="size-5" aria-hidden />
+                  {isSubmitting ? 'Entrando…' : 'Continuar com Google'}
+                </Button>
+              ) : null}
               <div
                 ref={gsiContainerRef}
-                className="absolute inset-0 opacity-[0.01]"
-                aria-hidden
+                className={`flex w-full justify-center overflow-hidden rounded-4xl border border-slate-200 bg-white py-0.5 shadow-sm ${
+                  !scriptLoadedSuccessfully || !clientId || isSubmitting
+                    ? 'hidden'
+                    : ''
+                }`}
+                data-testid={
+                  scriptLoadedSuccessfully && clientId && !isSubmitting
+                    ? 'google-login-button'
+                    : undefined
+                }
               />
             </div>
           )}
         </div>
 
         {error ? (
-          <p className="mt-4 text-center text-sm text-red-100" role="alert">
+          <p className="mt-4 text-center text-sm text-red-600" role="alert">
             {error}
           </p>
         ) : null}
