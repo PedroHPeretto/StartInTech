@@ -79,10 +79,15 @@ export interface GoogleAuthDto {
   idToken: string;
 }
 
+export interface AuthUserDto {
+  id: string;
+  email: string;
+}
+
 export interface AuthResponseDto {
   accessToken: string;
-  user: UserDto;
-  profileStatus: ProfileStatus;
+  user: AuthUserDto;
+  isProfileComplete: boolean;
 }
 
 export interface UpdateProfileDto {
