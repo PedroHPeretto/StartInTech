@@ -19,5 +19,6 @@ import { TypeOrmProfilesRepository } from './typeorm-profiles.repository.js';
       useExisting: TypeOrmProfilesRepository,
     },
   ],
+  exports: [PROFILES_REPOSITORY],
 })
 export class ProfilesModule {}
