@@ -311,6 +311,15 @@ jobs:
             --platform=managed \
             --quiet
 
+      - name: Show Cloud Run Revision Logs on Failure
+        if: failure()
+        run: |
+          echo "=== Fetching Cloud Run Logs for startintech-api ==="
+          gcloud logging read "resource.type=cloud_run_revision AND resource.labels.service_name=startintech-api" \
+            --project="${{ env.GCP_PROJECT }}" \
+            --limit=50 \
+            --format="table(timestamp,severity,textPayload)" || true
+
   deploy-frontend:
     name: Deploy Frontend (Firebase Hosting)
     needs: [changes, release-version, deploy-infra]
