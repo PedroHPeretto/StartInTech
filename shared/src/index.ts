@@ -191,6 +191,23 @@ export interface ResumeAnalysisDto {
   createdAt: string;
 }
 
+export interface ExtractedSkillDto {
+  id: string;
+  name: string;
+  category: SkillCategory;
+}
+
+export interface SkillsExtractionResponseDto {
+  resumeId: string;
+  careerTrack: CareerTrackSummaryDto;
+  skills: {
+    detected: ExtractedSkillDto[];
+    missing: ExtractedSkillDto[];
+  };
+  totalDetected: number;
+  totalMissing: number;
+}
+
 export enum ResumeSubmissionMode {
   FILE_UPLOAD = "FILE_UPLOAD",
   RAW_TEXT = "RAW_TEXT",
