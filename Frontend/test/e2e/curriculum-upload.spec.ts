@@ -2,6 +2,22 @@ import { expect, test } from '@playwright/test';
 
 const VALID_RAW_TEXT = 'a'.repeat(120);
 
+async function loginWithCompleteProfile(page: import('@playwright/test').Page) {
+  await page.goto('/login');
+  await page.getByTestId('google-login-button').click();
+  await expect(page).toHaveURL(/\/dashboard$/);
+}
+
+async function openCurriculumUpload(page: import('@playwright/test').Page) {
+  await page.evaluate(() => {
+    void window.__STARTINTECH_ROUTER__?.navigate({ to: '/curriculum/upload' });
+  });
+  await expect(page).toHaveURL(/\/curriculum\/upload$/);
+  await expect(
+    page.getByRole('heading', { name: 'Enviar currículo' }),
+  ).toBeVisible();
+}
+
 test.describe('curriculum upload', () => {
   test.beforeEach(async ({ page }) => {
     await page.addInitScript(() => {
@@ -28,13 +44,8 @@ test.describe('curriculum upload', () => {
       await route.fulfill({ status: 500, body: 'should not be called' });
     });
 
-    await page.goto('/login');
-    await page.getByTestId('google-login-button').click();
-    await page.goto('/curriculum/upload');
-
-    await expect(
-      page.getByRole('heading', { name: 'Enviar currículo' }),
-    ).toBeVisible();
+    await loginWithCompleteProfile(page);
+    await openCurriculumUpload(page);
 
     const oversized = {
       name: 'curriculum.pdf',
@@ -71,9 +82,8 @@ test.describe('curriculum upload', () => {
       });
     });
 
-    await page.goto('/login');
-    await page.getByTestId('google-login-button').click();
-    await page.goto('/curriculum/upload');
+    await loginWithCompleteProfile(page);
+    await openCurriculumUpload(page);
 
     await page.getByTestId('tab-text').click();
     await page.getByTestId('resume-raw-text').fill(VALID_RAW_TEXT);
