@@ -14,10 +14,7 @@ import {
 import type { User } from '../users/user.entity.js';
 import { ResumeAnalysisSkill } from './resume-analysis-skill.entity.js';
 import { ResumeAnalysis } from './resume-analysis.entity.js';
-import {
-  normalizeSkillNameKey,
-  sanitizeSkillName,
-} from './skill-name.util.js';
+import { normalizeSkillNameKey, sanitizeSkillName } from './skill-name.util.js';
 import { Skill } from './skill.entity.js';
 import type {
   CreateResumeAnalysisParams,

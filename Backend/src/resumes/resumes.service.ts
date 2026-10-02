@@ -117,7 +117,9 @@ export class ResumesService {
 
     const profile = await this.profiles.findByUserId(userId);
     if (!profile) {
-      throw new UnprocessableEntityException('Complete your profile before analyzing');
+      throw new UnprocessableEntityException(
+        'Complete your profile before analyzing',
+      );
     }
 
     const careerTrack = await this.profiles.findCareerTrackById(
@@ -130,7 +132,9 @@ export class ResumesService {
     const resumeText = await this.resolveResumeText(analysis);
     const trimmedText = resumeText.trim();
     if (trimmedText.length < RESUME_RAW_TEXT_MIN_LENGTH) {
-      throw new UnprocessableEntityException('Resume text is too short to analyze');
+      throw new UnprocessableEntityException(
+        'Resume text is too short to analyze',
+      );
     }
 
     const aiResult = await this.ai.extractSkillsFromResume(trimmedText, {
