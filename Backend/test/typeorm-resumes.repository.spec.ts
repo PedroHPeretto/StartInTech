@@ -1,17 +1,29 @@
 import { ConflictException } from '@nestjs/common';
 import { describe, expect, it, vi } from 'vitest';
-import { DataSource, QueryFailedError, type Repository } from 'typeorm';
-import type { ResumeAnalysis } from '../src/resumes/resume-analysis.entity.js';
+import {
+  DataSource,
+  QueryFailedError,
+  type EntityManager,
+  type Repository,
+} from 'typeorm';
+import { ResumeAnalysis } from '../src/resumes/resume-analysis.entity.js';
 import { TypeOrmResumesRepository } from '../src/resumes/typeorm-resumes.repository.js';
 
 function createRepository(
-  analyses: Repository<ResumeAnalysis>,
+  manager: Partial<EntityManager>,
 ): TypeOrmResumesRepository {
+  const dataSource = {
+    transaction: vi.fn(async (fn: (em: EntityManager) => Promise<unknown>) =>
+      fn(manager as EntityManager),
+    ),
+  } as unknown as DataSource;
+
   return new TypeOrmResumesRepository(
-    analyses,
+    {} as Repository<ResumeAnalysis>,
     {} as Repository<never>,
     {} as Repository<never>,
-    { transaction: vi.fn() } as unknown as DataSource,
+    {} as Repository<never>,
+    dataSource,
   );
 }
 
@@ -26,19 +38,28 @@ describe('TypeOrmResumesRepository', () => {
 
   it('inserts a new resume analysis record and returns the created record', async () => {
     const createdAt = new Date('2026-03-01T12:00:00.000Z');
-    const mockRepo = {
-      create: vi.fn().mockImplementation((entity) => entity),
+    const manager = {
+      query: vi.fn().mockResolvedValue(undefined),
+      create: vi.fn().mockImplementation((_entity, payload) => payload),
       insert: vi.fn().mockResolvedValue({
         identifiers: [{ id: params.id }],
         generatedMaps: [{ createdAt }],
         raw: [{ created_at: createdAt.toISOString() }],
       }),
-    } as unknown as Repository<ResumeAnalysis>;
+      createQueryBuilder: vi.fn().mockReturnValue({
+        innerJoin: vi.fn().mockReturnThis(),
+        where: vi.fn().mockReturnThis(),
+        getCount: vi.fn().mockResolvedValue(0),
+        orderBy: vi.fn().mockReturnThis(),
+        getOne: vi.fn().mockResolvedValue(null),
+      }),
+    };
 
-    const repo = createRepository(mockRepo);
+    const repo = createRepository(manager);
     const result = await repo.create(params);
 
-    expect(mockRepo.create).toHaveBeenCalledWith(
+    expect(manager.insert).toHaveBeenCalledWith(
+      ResumeAnalysis,
       expect.objectContaining({
         id: params.id,
         fileUrl: params.fileUrl,
@@ -48,13 +69,15 @@ describe('TypeOrmResumesRepository', () => {
         user: { id: params.userId },
       }),
     );
-    expect(mockRepo.insert).toHaveBeenCalledTimes(1);
     expect(result).toEqual({
-      id: params.id,
-      userId: params.userId,
-      fileUrl: params.fileUrl,
-      rawText: null,
-      createdAt,
+      record: {
+        id: params.id,
+        userId: params.userId,
+        fileUrl: params.fileUrl,
+        rawText: null,
+        createdAt,
+      },
+      purgedFileUrls: [],
     });
   });
 
@@ -66,12 +89,20 @@ describe('TypeOrmResumesRepository', () => {
     );
     Object.assign(uniqueError, { driverError: { code: '23505' } });
 
-    const mockRepo = {
-      create: vi.fn().mockImplementation((entity) => entity),
+    const manager = {
+      query: vi.fn().mockResolvedValue(undefined),
+      create: vi.fn().mockImplementation((_entity, payload) => payload),
       insert: vi.fn().mockRejectedValue(uniqueError),
-    } as unknown as Repository<ResumeAnalysis>;
+      createQueryBuilder: vi.fn().mockReturnValue({
+        innerJoin: vi.fn().mockReturnThis(),
+        where: vi.fn().mockReturnThis(),
+        getCount: vi.fn().mockResolvedValue(0),
+        orderBy: vi.fn().mockReturnThis(),
+        getOne: vi.fn().mockResolvedValue(null),
+      }),
+    };
 
-    const repo = createRepository(mockRepo);
+    const repo = createRepository(manager);
 
     await expect(repo.create(params)).rejects.toBeInstanceOf(ConflictException);
   });
@@ -79,12 +110,20 @@ describe('TypeOrmResumesRepository', () => {
   it('rethrows unexpected errors', async () => {
     const unexpectedError = new Error('Database connection lost');
 
-    const mockRepo = {
-      create: vi.fn().mockImplementation((entity) => entity),
+    const manager = {
+      query: vi.fn().mockResolvedValue(undefined),
+      create: vi.fn().mockImplementation((_entity, payload) => payload),
       insert: vi.fn().mockRejectedValue(unexpectedError),
-    } as unknown as Repository<ResumeAnalysis>;
+      createQueryBuilder: vi.fn().mockReturnValue({
+        innerJoin: vi.fn().mockReturnThis(),
+        where: vi.fn().mockReturnThis(),
+        getCount: vi.fn().mockResolvedValue(0),
+        orderBy: vi.fn().mockReturnThis(),
+        getOne: vi.fn().mockResolvedValue(null),
+      }),
+    };
 
-    const repo = createRepository(mockRepo);
+    const repo = createRepository(manager);
 
     await expect(repo.create(params)).rejects.toThrow(
       'Database connection lost',

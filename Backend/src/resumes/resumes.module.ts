@@ -3,7 +3,9 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { AiModule } from '../ai/ai.module.js';
 import { AuthModule } from '../auth/auth.module.js';
 import { ProfilesModule } from '../profiles/profiles.module.js';
+import { AtsScoringService } from './ats-scoring.service.js';
 import { GcsStorageService } from './gcs-storage.service.js';
+import { PendingStoragePurge } from './pending-storage-purge.entity.js';
 import { ResumeAnalysisSkill } from './resume-analysis-skill.entity.js';
 import { ResumeAnalysis } from './resume-analysis.entity.js';
 import { ResumesController } from './resumes.controller.js';
@@ -14,7 +16,12 @@ import { TypeOrmResumesRepository } from './typeorm-resumes.repository.js';
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([ResumeAnalysis, Skill, ResumeAnalysisSkill]),
+    TypeOrmModule.forFeature([
+      ResumeAnalysis,
+      Skill,
+      ResumeAnalysisSkill,
+      PendingStoragePurge,
+    ]),
     AuthModule,
     ProfilesModule,
     AiModule,
@@ -22,6 +29,7 @@ import { TypeOrmResumesRepository } from './typeorm-resumes.repository.js';
   controllers: [ResumesController],
   providers: [
     ResumesService,
+    AtsScoringService,
     GcsStorageService,
     TypeOrmResumesRepository,
     {
