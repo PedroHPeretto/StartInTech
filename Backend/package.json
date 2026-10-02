@@ -19,7 +19,7 @@
     "test:watch": "vitest",
     "test:cov": "vitest run --coverage",
     "typeorm": "typeorm",
-    "db:migrate": "typeorm migration:run -d src/database/data-source.ts || echo 'No pending migrations'"
+    "db:migrate": "bun run build && typeorm migration:run -d dist/database/data-source.js"
   },
   "dependencies": {
     "@google-cloud/storage": "^8.2.0",
