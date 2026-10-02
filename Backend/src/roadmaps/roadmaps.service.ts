@@ -43,7 +43,9 @@ export class RoadmapsService {
     };
   }
 
-  async getMyTrackProgress(userId: string): Promise<RoadmapProgressResponseDto> {
+  async getMyTrackProgress(
+    userId: string,
+  ): Promise<RoadmapProgressResponseDto> {
     const profile = await this.profiles.getByUserId(userId);
     const roadmap = await this.roadmaps.findWithNodesByCareerTrackId(
       profile.careerTrack.id,

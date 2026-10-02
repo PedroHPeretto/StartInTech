@@ -1,8 +1,6 @@
 import type { MigrationInterface, QueryRunner } from 'typeorm';
 
-export class ResumeAnalysisSkillsAnalysisStatusIndex1759409000000
-  implements MigrationInterface
-{
+export class ResumeAnalysisSkillsAnalysisStatusIndex1759409000000 implements MigrationInterface {
   name = 'ResumeAnalysisSkillsAnalysisStatusIndex1759409000000';
 
   public async up(queryRunner: QueryRunner): Promise<void> {

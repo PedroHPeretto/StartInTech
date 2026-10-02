@@ -306,10 +306,6 @@ export class ResumesService {
       createdAt: record.createdAt.toISOString(),
     };
   }
-
-  async findLatestPresentSkills(userId: string) {
-    return this.resumes.findLatestPresentSkills(userId);
-  }
 }
 
 /**

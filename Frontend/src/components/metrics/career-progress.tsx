@@ -120,7 +120,9 @@ export function CareerTrailProgress({
       {showTopicSummary && totalTopics > 0 ? (
         <p className="text-xs font-sans text-slate-500">
           Você completou{' '}
-          <span className="font-semibold text-slate-700">{completedTopics}</span>{' '}
+          <span className="font-semibold text-slate-700">
+            {completedTopics}
+          </span>{' '}
           de <span className="font-semibold text-slate-700">{totalTopics}</span>{' '}
           tópicos essenciais
         </p>
