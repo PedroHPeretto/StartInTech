@@ -106,6 +106,7 @@ function toDto(
     priority: node.priority,
     sequenceOrder: node.sequenceOrder,
     skillId: node.skillId,
+    lessons: [],
     children,
   };
 }
