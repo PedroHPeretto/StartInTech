@@ -1,11 +1,14 @@
 import { WorkplaceType } from '@startintech/shared';
 import {
   Column,
+  CreateDateColumn,
   Entity,
   JoinColumn,
   ManyToOne,
+  OneToMany,
   PrimaryGeneratedColumn,
 } from 'typeorm';
+import { JobSkill } from './job-skill.entity.js';
 import { CareerTrack } from '../career-tracks/career-track.entity.js';
 
 @Entity('job_opportunities')
@@ -42,4 +45,10 @@ export class JobOpportunity {
 
   @Column({ name: 'is_active', type: 'boolean', default: true })
   isActive!: boolean;
+
+  @CreateDateColumn({ name: 'created_at', type: 'timestamptz' })
+  createdAt!: Date;
+
+  @OneToMany(() => JobSkill, (jobSkill) => jobSkill.job)
+  jobSkills!: JobSkill[];
 }

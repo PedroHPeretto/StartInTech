@@ -1,6 +1,12 @@
 import type { WorkplaceType } from '@startintech/shared';
 import type { AdzunaJobListingInput } from './adzuna-job.adapter.js';
 
+export interface JobSkillRequirement {
+  id: string;
+  name: string;
+  isMandatory: boolean;
+}
+
 export interface JobListingRecord {
   id: string;
   title: string;
@@ -9,28 +15,23 @@ export interface JobListingRecord {
   workplaceType: WorkplaceType;
   description: string;
   applicationUrl: string;
+  createdAt: Date;
   careerTrack: {
     id: string;
     name: string;
   };
+  requirements: JobSkillRequirement[];
 }
 
-export interface ListJobsParams {
+export interface ListJobsFilterParams {
   careerTrackId: string;
   workplaceType?: WorkplaceType;
   search?: string;
-  page: number;
-  limit: number;
-}
-
-export interface ListJobsResult {
-  items: JobListingRecord[];
-  total: number;
 }
 
 export interface JobsRepository {
   countActiveByCareerTrack(careerTrackId: string): Promise<number>;
-  findPaginated(params: ListJobsParams): Promise<ListJobsResult>;
+  findAllForListing(params: ListJobsFilterParams): Promise<JobListingRecord[]>;
   upsertMany(
     careerTrackId: string,
     listings: AdzunaJobListingInput[],

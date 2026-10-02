@@ -293,16 +293,36 @@ export interface JobRecommendationCardDto extends JobOpportunityDto {
   missingSkills: string[];
 }
 
+export enum JobSortBy {
+  NEWEST = "NEWEST",
+  MATCH_SCORE = "MATCH_SCORE",
+}
+
 export interface GetJobsQueryDto {
   page?: number;
   limit?: number;
   workplaceType?: WorkplaceType;
   search?: string;
+  onlyHighCompatibility?: boolean;
+  sortBy?: JobSortBy;
 }
 
 export interface JobListingCareerTrackDto {
   id: string;
   name: string;
+}
+
+export interface JobMatchSkillDto {
+  id: string;
+  name: string;
+  isMandatory: boolean;
+}
+
+export interface JobMatchDto {
+  score: number;
+  isHighCompatibility: boolean;
+  matchedSkills: JobMatchSkillDto[];
+  missingSkills: JobMatchSkillDto[];
 }
 
 export interface JobListingDto {
@@ -314,6 +334,8 @@ export interface JobListingDto {
   description: string;
   applicationUrl: string;
   careerTrack: JobListingCareerTrackDto;
+  requirements: JobMatchSkillDto[];
+  match: JobMatchDto | null;
 }
 
 export interface PaginatedJobsMetaDto {

@@ -1,5 +1,5 @@
 import { BadGatewayException } from '@nestjs/common';
-import { SeniorityLevel, WorkplaceType } from '@startintech/shared';
+import { JobSortBy, SeniorityLevel, WorkplaceType } from '@startintech/shared';
 import * as Sentry from '@sentry/nestjs';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type {
@@ -9,12 +9,14 @@ import type {
 import { ProfilesService } from '../src/profiles/profiles.service.js';
 import type { AdzunaJobListingInput } from '../src/jobs/adzuna-job.adapter.js';
 import { AdzunaJobAdapter } from '../src/jobs/adzuna-job.adapter.js';
+import { JobMatchingService } from '../src/jobs/job-matching.service.js';
 import type {
   JobListingRecord,
   JobsRepository,
-  ListJobsParams,
+  ListJobsFilterParams,
 } from '../src/jobs/jobs.repository.js';
 import { JobsService } from '../src/jobs/jobs.service.js';
+import type { ResumesService } from '../src/resumes/resumes.service.js';
 
 vi.mock('@sentry/nestjs', () => ({
   captureException: vi.fn(),
@@ -36,7 +38,14 @@ const PROFILE: ProfileRecord = {
   careerTrack: CAREER_TRACK,
 };
 
-function jobRecord(id: string, title: string): JobListingRecord {
+function jobRecord(
+  id: string,
+  title: string,
+  options?: {
+    createdAt?: Date;
+    requirements?: JobListingRecord['requirements'];
+  },
+): JobListingRecord {
   return {
     id,
     title,
@@ -45,23 +54,22 @@ function jobRecord(id: string, title: string): JobListingRecord {
     workplaceType: WorkplaceType.ON_SITE,
     description: 'Desc',
     applicationUrl: `https://example.com/${id}`,
+    createdAt: options?.createdAt ?? new Date('2025-01-01T00:00:00.000Z'),
     careerTrack: {
       id: CAREER_TRACK.id,
       name: CAREER_TRACK.name,
     },
+    requirements: options?.requirements ?? [],
   };
 }
 
 class FakeJobsRepository implements JobsRepository {
-  findPaginatedCalls = 0;
+  findAllCalls = 0;
   upsertCalls = 0;
   lastUpsertListings: AdzunaJobListingInput[] = [];
 
   constructor(
-    private readonly sequences: Array<{
-      total: number;
-      items: JobListingRecord[];
-    }>,
+    private readonly sequences: JobListingRecord[][],
     private readonly cachedCount = 0,
   ) {}
 
@@ -69,19 +77,12 @@ class FakeJobsRepository implements JobsRepository {
     return Promise.resolve(this.cachedCount);
   }
 
-  findPaginated(params: ListJobsParams): Promise<{
-    items: JobListingRecord[];
-    total: number;
-  }> {
-    this.findPaginatedCalls += 1;
+  findAllForListing(
+    _params: ListJobsFilterParams,
+  ): Promise<JobListingRecord[]> {
+    this.findAllCalls += 1;
     const next = this.sequences.shift();
-    if (!next) {
-      return Promise.resolve({ items: [], total: 0 });
-    }
-    return Promise.resolve({
-      items: next.items.slice(0, params.limit),
-      total: next.total,
-    });
+    return Promise.resolve(next ?? []);
   }
 
   upsertMany(
@@ -108,6 +109,19 @@ class FakeAdzunaAdapter {
   }
 }
 
+class FakeResumesService {
+  constructor(
+    private readonly result: {
+      hasResumeAnalyzed: boolean;
+      presentSkillIds: string[];
+    },
+  ) {}
+
+  findLatestPresentSkills() {
+    return Promise.resolve(this.result);
+  }
+}
+
 function profilesService(): ProfilesService {
   const repository: ProfilesRepository = {
     findCareerTrackById: () => Promise.resolve(null),
@@ -120,9 +134,15 @@ function profilesService(): ProfilesService {
 function jobsService(
   repository: FakeJobsRepository,
   adzuna: FakeAdzunaAdapter,
+  resumes: FakeResumesService = new FakeResumesService({
+    hasResumeAnalyzed: false,
+    presentSkillIds: [],
+  }),
 ): JobsService {
   return new JobsService(
     profilesService(),
+    resumes as unknown as ResumesService,
+    new JobMatchingService(),
     adzuna as unknown as AdzunaJobAdapter,
     repository,
   );
@@ -135,10 +155,9 @@ describe('JobsService', () => {
 
   it('returns cached results without calling Adzuna when the page is fully covered', async () => {
     const repository = new FakeJobsRepository([
-      {
-        total: 12,
-        items: [jobRecord('job-1', 'Backend Dev')],
-      },
+      Array.from({ length: 12 }, (_, index) =>
+        jobRecord(`job-${index}`, `Role ${index}`),
+      ),
     ]);
     const adzuna = new FakeAdzunaAdapter();
     const service = jobsService(repository, adzuna);
@@ -147,8 +166,8 @@ describe('JobsService', () => {
 
     expect(adzuna.searchCalls).toBe(0);
     expect(repository.upsertCalls).toBe(0);
-    expect(repository.findPaginatedCalls).toBe(1);
-    expect(response.items).toHaveLength(1);
+    expect(repository.findAllCalls).toBe(1);
+    expect(response.items).toHaveLength(10);
     expect(response.meta).toEqual({
       total: 12,
       page: 1,
@@ -156,13 +175,18 @@ describe('JobsService', () => {
       totalPages: 2,
       hasNextPage: true,
     });
+    expect(response.items[0]?.match).toBeNull();
+    expect(response.items[0]?.requirements).toEqual([]);
   });
 
   it('calls Adzuna on cache miss, upserts listings, and re-queries', async () => {
-    const repository = new FakeJobsRepository([
-      { total: 2, items: [jobRecord('job-1', 'Junior Dev')] },
-      { total: 15, items: [jobRecord('job-2', 'Frontend Dev')] },
-    ]);
+    const repository = new FakeJobsRepository(
+      [
+        [jobRecord('job-1', 'Junior Dev')],
+        [jobRecord('job-2', 'Frontend Dev')],
+      ],
+      15,
+    );
     const adzuna = new FakeAdzunaAdapter();
     adzuna.listings = [
       {
@@ -181,14 +205,14 @@ describe('JobsService', () => {
     expect(adzuna.searchCalls).toBe(1);
     expect(repository.upsertCalls).toBe(1);
     expect(repository.lastUpsertListings).toEqual(adzuna.listings);
-    expect(repository.findPaginatedCalls).toBe(2);
-    expect(response.meta.total).toBe(15);
+    expect(repository.findAllCalls).toBe(2);
+    expect(response.meta.total).toBe(1);
     expect(response.items[0]?.title).toBe('Frontend Dev');
   });
 
   it('returns stale cache and reports to Sentry when Adzuna fails but rows exist', async () => {
     const repository = new FakeJobsRepository(
-      [{ total: 3, items: [jobRecord('job-1', 'Cached role')] }],
+      [[jobRecord('job-1', 'Cached role')]],
       3,
     );
     const adzuna = new FakeAdzunaAdapter();
@@ -198,12 +222,12 @@ describe('JobsService', () => {
     const response = await service.listJobs(USER_ID, { page: 1, limit: 10 });
 
     expect(Sentry.captureException).toHaveBeenCalledTimes(1);
-    expect(response.meta.total).toBe(3);
+    expect(response.meta.total).toBe(1);
     expect(response.items).toHaveLength(1);
   });
 
   it('throws 502 when Adzuna fails and there is no cached data', async () => {
-    const repository = new FakeJobsRepository([{ total: 0, items: [] }], 0);
+    const repository = new FakeJobsRepository([[]], 0);
     const adzuna = new FakeAdzunaAdapter();
     adzuna.error = new Error('Adzuna responded with status 503');
 
@@ -213,5 +237,89 @@ describe('JobsService', () => {
       service.listJobs(USER_ID, { page: 1, limit: 10 }),
     ).rejects.toBeInstanceOf(BadGatewayException);
     expect(Sentry.captureException).toHaveBeenCalledTimes(1);
+  });
+
+  it('sorts by match score descending and keeps null matches last', async () => {
+    const skillA = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaa0001';
+    const skillB = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbb001';
+    const skillC = 'cccccccc-cccc-4ccc-8ccc-cccccccc0001';
+    const repository = new FakeJobsRepository([
+      [
+        jobRecord('low', 'Low Match', {
+          requirements: [
+            { id: skillA, name: 'A', isMandatory: true },
+            { id: skillC, name: 'C', isMandatory: false },
+          ],
+        }),
+        jobRecord('high', 'High Match', {
+          requirements: [{ id: skillA, name: 'A', isMandatory: true }],
+        }),
+      ],
+    ]);
+    const resumes = new FakeResumesService({
+      hasResumeAnalyzed: true,
+      presentSkillIds: [skillA, skillB],
+    });
+    const service = jobsService(repository, new FakeAdzunaAdapter(), resumes);
+
+    const response = await service.listJobs(USER_ID, {
+      sortBy: JobSortBy.MATCH_SCORE,
+      limit: 2,
+    });
+
+    expect(response.items.map((item) => item.title)).toEqual([
+      'High Match',
+      'Low Match',
+    ]);
+    expect(response.items[0]?.match?.score).toBe(100);
+    expect(response.items[1]?.match?.score).toBe(75);
+  });
+
+  it('filters to only high-compatibility jobs when requested', async () => {
+    const skillMandatory = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaa0001';
+    const skillGap = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbb001';
+    const repository = new FakeJobsRepository([
+      [
+        jobRecord('seal', 'Seal Job', {
+          requirements: [
+            { id: skillMandatory, name: 'Core', isMandatory: true },
+          ],
+        }),
+        jobRecord('no-seal', 'No Seal Job', {
+          requirements: [
+            { id: skillMandatory, name: 'Core', isMandatory: true },
+            { id: skillGap, name: 'Gap', isMandatory: true },
+          ],
+        }),
+      ],
+    ]);
+    const resumes = new FakeResumesService({
+      hasResumeAnalyzed: true,
+      presentSkillIds: [skillMandatory],
+    });
+    const service = jobsService(repository, new FakeAdzunaAdapter(), resumes);
+
+    const response = await service.listJobs(USER_ID, {
+      onlyHighCompatibility: true,
+      limit: 2,
+    });
+
+    expect(response.items).toHaveLength(1);
+    expect(response.items[0]?.title).toBe('Seal Job');
+    expect(response.items[0]?.match?.isHighCompatibility).toBe(true);
+  });
+
+  it('returns an empty page for high-compatibility filter without resume analysis', async () => {
+    const repository = new FakeJobsRepository([
+      [jobRecord('job-1', 'Any Job')],
+    ]);
+    const service = jobsService(repository, new FakeAdzunaAdapter());
+
+    const response = await service.listJobs(USER_ID, {
+      onlyHighCompatibility: true,
+    });
+
+    expect(response.items).toHaveLength(0);
+    expect(response.meta.total).toBe(0);
   });
 });
