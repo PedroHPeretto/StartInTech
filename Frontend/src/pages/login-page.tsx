@@ -81,17 +81,20 @@ export function LoginPage() {
     void handleCredential('e2e-mock-google-id-token');
   };
 
+  const googleButtonClassName =
+    'w-full gap-2 bg-white text-brand-midnight hover:bg-white/90';
+
   return (
-    <div className="flex min-h-screen flex-col items-center justify-center bg-brand-light-gray px-4">
-      <div className="w-full max-w-md rounded-2xl border border-border bg-background p-8 shadow-sm">
+    <div className="flex min-h-screen flex-col items-center justify-center bg-brand-blue px-4">
+      <div className="w-full max-w-md">
         <div className="mb-8 flex justify-center">
-          <BrandHeader href={undefined} showTagline />
+          <BrandHeader href={undefined} showTagline theme="dark" />
         </div>
 
-        <h1 className="font-heading text-center text-2xl font-bold text-brand-midnight">
+        <h1 className="font-heading text-center text-2xl font-bold text-white">
           Entrar na StartInTech
         </h1>
-        <p className="mt-2 text-center text-sm text-muted-foreground">
+        <p className="mt-2 text-center text-sm text-white/80">
           Use sua conta Google para continuar.
         </p>
 
@@ -100,7 +103,7 @@ export function LoginPage() {
             <Button
               type="button"
               size="lg"
-              className="w-full gap-2"
+              className={googleButtonClassName}
               data-testid="google-login-button"
               disabled={isSubmitting}
               onClick={handleE2ELogin}
@@ -113,7 +116,7 @@ export function LoginPage() {
               <Button
                 type="button"
                 size="lg"
-                className="pointer-events-none w-full gap-2"
+                className={`pointer-events-none ${googleButtonClassName}`}
                 disabled={isSubmitting || !scriptLoadedSuccessfully}
                 data-testid="google-login-button"
               >
@@ -130,7 +133,7 @@ export function LoginPage() {
         </div>
 
         {error ? (
-          <p className="mt-4 text-center text-sm text-destructive" role="alert">
+          <p className="mt-4 text-center text-sm text-red-100" role="alert">
             {error}
           </p>
         ) : null}
