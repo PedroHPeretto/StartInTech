@@ -133,10 +133,7 @@ export function LoginPage() {
         </div>
 
         {error ? (
-          <p
-            className="mt-4 text-center text-sm text-red-100"
-            role="alert"
-          >
+          <p className="mt-4 text-center text-sm text-red-100" role="alert">
             {error}
           </p>
         ) : null}
