@@ -64,6 +64,13 @@ class InMemoryResumesRepository implements ResumesRepository {
     return Promise.resolve(record ?? null);
   }
 
+  findLatestPresentSkills(_userId: string) {
+    return Promise.resolve({
+      hasResumeAnalyzed: false,
+      presentSkillIds: [] as string[],
+    });
+  }
+
   persistSkillExtraction(
     resumeAnalysisId: string,
     links: SkillLinkInput[],

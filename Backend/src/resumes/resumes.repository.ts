@@ -30,12 +30,18 @@ export interface PersistedSkillExtraction {
   missing: ExtractedSkillDto[];
 }
 
+export interface LatestPresentSkillsResult {
+  hasResumeAnalyzed: boolean;
+  presentSkillIds: string[];
+}
+
 export interface ResumesRepository {
   create(params: CreateResumeAnalysisParams): Promise<ResumeAnalysisRecord>;
   findByIdForUser(
     id: string,
     userId: string,
   ): Promise<ResumeAnalysisRecord | null>;
+  findLatestPresentSkills(userId: string): Promise<LatestPresentSkillsResult>;
   persistSkillExtraction(
     resumeAnalysisId: string,
     links: SkillLinkInput[],

@@ -1,5 +1,5 @@
 import { Outlet, useNavigate, useRouterState } from '@tanstack/react-router';
-import { FileText, LayoutDashboard, Map } from 'lucide-react';
+import { Briefcase, FileText, LayoutDashboard, Map } from 'lucide-react';
 import { useState } from 'react';
 import { flushSync } from 'react-dom';
 import { useAuth } from '@/auth/use-auth';
@@ -19,6 +19,11 @@ const appNavItems: NavItemConfig[] = [
     icon: <LayoutDashboard size={20} />,
   },
   {
+    id: 'jobs',
+    label: 'Vagas',
+    icon: <Briefcase size={20} />,
+  },
+  {
     id: 'roadmaps',
     label: 'Trilhas de Carreira',
     icon: <Map size={20} />,
@@ -32,6 +37,7 @@ const appNavItems: NavItemConfig[] = [
 
 const mobileNavItems = [
   { id: 'dashboard', label: 'Início', icon: <LayoutDashboard size={20} /> },
+  { id: 'jobs', label: 'Vagas', icon: <Briefcase size={20} /> },
   { id: 'roadmaps', label: 'Trilha', icon: <Map size={20} /> },
   { id: 'resume', label: 'Currículo', icon: <FileText size={20} /> },
 ];

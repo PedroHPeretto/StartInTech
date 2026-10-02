@@ -29,5 +29,6 @@ import { TypeOrmResumesRepository } from './typeorm-resumes.repository.js';
       useExisting: TypeOrmResumesRepository,
     },
   ],
+  exports: [ResumesService],
 })
 export class ResumesModule {}

@@ -293,6 +293,42 @@ export interface JobRecommendationCardDto extends JobOpportunityDto {
   missingSkills: string[];
 }
 
+export interface GetJobsQueryDto {
+  page?: number;
+  limit?: number;
+  workplaceType?: WorkplaceType;
+  search?: string;
+}
+
+export interface JobListingCareerTrackDto {
+  id: string;
+  name: string;
+}
+
+export interface JobListingDto {
+  id: string;
+  title: string;
+  company: string;
+  location: string;
+  workplaceType: WorkplaceType;
+  description: string;
+  applicationUrl: string;
+  careerTrack: JobListingCareerTrackDto;
+}
+
+export interface PaginatedJobsMetaDto {
+  total: number;
+  page: number;
+  limit: number;
+  totalPages: number;
+  hasNextPage: boolean;
+}
+
+export interface PaginatedJobsResponseDto {
+  items: JobListingDto[];
+  meta: PaginatedJobsMetaDto;
+}
+
 export interface RoadmapGraphNodeDto {
   id: string;
   title: string;
@@ -325,4 +361,37 @@ export interface RoadmapDetailResponseDto {
   description: string | null;
   careerTrack: CareerTrackSummaryDto;
   nodes: RoadmapNodeResponseDto[];
+}
+
+export enum DynamicRoadmapNodeStatus {
+  MASTERED = "MASTERED",
+  PENDING = "PENDING",
+  NEUTRAL = "NEUTRAL",
+}
+
+export interface DynamicRoadmapNodeDto {
+  id: string;
+  title: string;
+  description: string | null;
+  priority: SkillPriority;
+  sequenceOrder: number;
+  skillId: string | null;
+  status: DynamicRoadmapNodeStatus;
+  children: DynamicRoadmapNodeDto[];
+}
+
+export interface RoadmapProgressMetricsDto {
+  totalTrackableNodes: number;
+  masteredNodesCount: number;
+  overallProgressPercentage: number;
+  essentialProgressPercentage: number;
+}
+
+export interface RoadmapProgressResponseDto {
+  id: string;
+  title: string;
+  careerTrack: CareerTrackSummaryDto;
+  hasResumeAnalyzed: boolean;
+  metrics: RoadmapProgressMetricsDto;
+  nodes: DynamicRoadmapNodeDto[];
 }

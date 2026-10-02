@@ -9,6 +9,10 @@ describe('resolveActiveNavId', () => {
     expect(resolveActiveNavId('/dashboard')).toBe('dashboard');
   });
 
+  it('marks the jobs item on the jobs board', () => {
+    expect(resolveActiveNavId('/jobs')).toBe('jobs');
+  });
+
   it('marks the career track item on the roadmap', () => {
     expect(resolveActiveNavId('/roadmap')).toBe('roadmaps');
   });
@@ -31,12 +35,12 @@ describe('resolveActiveNavId', () => {
 describe('navRouteFor', () => {
   it('returns the page for each shell destination', () => {
     expect(navRouteFor('dashboard')).toBe('/dashboard');
+    expect(navRouteFor('jobs')).toBe('/jobs');
     expect(navRouteFor('roadmaps')).toBe('/roadmap');
     expect(navRouteFor('resume')).toBe('/curriculum/upload');
   });
 
   it('ignores destinations that do not have a page', () => {
-    expect(navRouteFor('jobs')).toBeNull();
     expect(navRouteFor('settings')).toBeNull();
   });
 });
