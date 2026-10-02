@@ -172,12 +172,27 @@ export interface CareerRoadmapDto {
 }
 
 export interface FeedbackReportDto {
-  structuralScore: number;
-  formattingScore: number;
-  technicalKeywordsScore: number;
-  summaryFeedback: string;
-  actionableImprovements: string[];
-  recommendedStudyTopics: string[];
+  summary: string;
+  strengths: string[];
+  improvements: string[];
+  actionPlan: string[];
+  marketReadiness: SeniorityLevel;
+}
+
+export interface ResumeEvaluationResponseDto {
+  id: string;
+  atsScore: number;
+  report: FeedbackReportDto;
+  createdAt: string;
+  activeVersionsCount: number;
+}
+
+export interface ResumeHistoryItemDto {
+  id: string;
+  atsScore: number | null;
+  fileUrl: string | null;
+  createdAt: string;
+  isLatest: boolean;
 }
 
 export interface ResumeAnalysisDto {
@@ -187,7 +202,7 @@ export interface ResumeAnalysisDto {
   overallScore: number;
   detectedSkills: SkillDto[];
   missingSkills: SkillDto[];
-  feedbackReport: FeedbackReportDto | Record<string, unknown>;
+  feedbackReport: FeedbackReportDto;
   createdAt: string;
 }
 
