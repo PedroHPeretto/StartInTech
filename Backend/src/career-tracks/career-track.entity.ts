@@ -1,5 +1,4 @@
-import { Column, Entity, OneToMany, PrimaryGeneratedColumn } from 'typeorm';
-import type { Profile } from '../profiles/profile.entity.js';
+import { Column, Entity, PrimaryGeneratedColumn } from 'typeorm';
 
 @Entity('career_tracks')
 export class CareerTrack {
@@ -14,7 +13,4 @@ export class CareerTrack {
 
   @Column({ type: 'text' })
   description!: string;
-
-  @OneToMany('Profile', 'careerTrack')
-  profiles!: Profile[];
 }
