@@ -287,6 +287,10 @@ export interface JobQueryDto {
   technology?: string;
 }
 
+export interface JobSearchResponseDto {
+  jobs: JobOpportunityDto[];
+}
+
 export interface JobRecommendationCardDto extends JobOpportunityDto {
   isHighMatch: boolean;
   matchedSkills: string[];
@@ -309,6 +313,15 @@ export interface RoadmapGraphDto {
   nodes: RoadmapGraphNodeDto[];
 }
 
+export interface RoadmapLessonDto {
+  id: string;
+  title: string;
+  description: string;
+  readingTimeMinutes: number;
+  url: string;
+  isFree: boolean;
+}
+
 export interface RoadmapNodeResponseDto {
   id: string;
   title: string;
@@ -316,6 +329,7 @@ export interface RoadmapNodeResponseDto {
   priority: SkillPriority;
   sequenceOrder: number;
   skillId: string | null;
+  lessons: RoadmapLessonDto[];
   children: RoadmapNodeResponseDto[];
 }
 
