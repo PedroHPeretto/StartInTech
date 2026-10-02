@@ -191,19 +191,46 @@ export interface ResumeAnalysisDto {
   createdAt: string;
 }
 
-export interface GetUploadUrlDto {
-  filename: string;
-  contentType: string;
+export enum ResumeSubmissionMode {
+  FILE_UPLOAD = "FILE_UPLOAD",
+  RAW_TEXT = "RAW_TEXT",
+}
+
+export const RESUME_MAX_FILE_SIZE_BYTES = 5_242_880;
+
+export const RESUME_RAW_TEXT_MIN_LENGTH = 100;
+
+export const RESUME_RAW_TEXT_MAX_LENGTH = 50_000;
+
+export const RESUME_UPLOAD_URL_EXPIRES_IN_SECONDS = 300;
+
+export type ResumeUploadFileType =
+  | "application/pdf"
+  | "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
+
+export interface GenerateUploadUrlDto {
+  fileName: string;
+  fileType: ResumeUploadFileType;
+  fileSizeBytes: number;
 }
 
 export interface UploadUrlResponseDto {
   uploadUrl: string;
   fileKey: string;
+  expiresInSeconds: number;
 }
 
-export interface AnalyzeResumeDto {
+export interface SubmitResumeDto {
+  mode: ResumeSubmissionMode;
   fileKey?: string;
   rawText?: string;
+}
+
+export interface ResumeSubmissionResponseDto {
+  id: string;
+  userId: string;
+  status: "RECEIVED";
+  createdAt: string;
 }
 
 export interface JobOpportunityDto {
