@@ -44,6 +44,8 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Filter path changes
         uses: dorny/paths-filter@v3
@@ -83,6 +85,7 @@ jobs:
       - name: Calculate SemVer & Update CHANGELOG.md
         id: changelog
         uses: TriPSs/conventional-changelog-action@v6
+        continue-on-error: true
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           git-message: "chore(release): {version} [skip ci]"
@@ -90,16 +93,17 @@ jobs:
           preset: "angular"
           output-file: "CHANGELOG.md"
           skip-on-empty: false
+          git-push: "false"
 
       - name: Fallback tag resolution
         id: fallback_tag
-        if: steps.changelog.outputs.tag == ''
+        if: always() && (steps.changelog.outputs.tag == '' || steps.changelog.outcome == 'failure')
         run: |
           LATEST_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "v0.0.1")
           echo "tag=${LATEST_TAG}" >> $GITHUB_OUTPUT
 
       - name: Create GitHub Release
-        if: steps.changelog.outputs.skipped != 'true' && steps.changelog.outputs.tag != ''
+        if: always() && steps.changelog.outcome == 'success' && steps.changelog.outputs.skipped != 'true' && steps.changelog.outputs.tag != ''
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ steps.changelog.outputs.tag }}

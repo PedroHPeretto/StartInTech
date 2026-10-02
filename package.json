@@ -1,5 +1,6 @@
 {
   "name": "startintech-monorepo",
+  "version": "0.1.0",
   "private": true,
   "scripts": {
     "dev:frontend": "bun --cwd Frontend dev",
@@ -26,7 +27,7 @@
     "format": "bun --cwd Backend format && bun --cwd Frontend format && bunx prettier --write \"shared/src/**/*.ts\"",
     "test": "bun --cwd Backend test && bun --cwd Frontend test",
     "db:migrate": "bun --cwd Backend db:migrate",
-    "prepare": "husky"
+    "prepare": "husky || true"
   },
   "type": "module",
   "workspaces": [

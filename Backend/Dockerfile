@@ -12,7 +12,7 @@ COPY Backend/package.json ./Backend/
 COPY Frontend/package.json ./Frontend/
 
 # Install all dependencies across the monorepo
-RUN bun install --frozen-lockfile
+RUN bun install --frozen-lockfile --ignore-scripts
 
 # Copy shared source and compile shared contracts
 COPY shared/ ./shared/
@@ -38,7 +38,7 @@ COPY shared/package.json ./shared/
 COPY Backend/package.json ./Backend/
 COPY Frontend/package.json ./Frontend/
 
-RUN bun install --frozen-lockfile --production
+RUN bun install --frozen-lockfile --production --ignore-scripts
 
 # Copy compiled shared library and backend distribution from builder
 COPY --from=builder /app/shared ./shared
