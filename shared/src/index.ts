@@ -326,3 +326,36 @@ export interface RoadmapDetailResponseDto {
   careerTrack: CareerTrackSummaryDto;
   nodes: RoadmapNodeResponseDto[];
 }
+
+export enum DynamicRoadmapNodeStatus {
+  MASTERED = "MASTERED",
+  PENDING = "PENDING",
+  NEUTRAL = "NEUTRAL",
+}
+
+export interface DynamicRoadmapNodeDto {
+  id: string;
+  title: string;
+  description: string | null;
+  priority: SkillPriority;
+  sequenceOrder: number;
+  skillId: string | null;
+  status: DynamicRoadmapNodeStatus;
+  children: DynamicRoadmapNodeDto[];
+}
+
+export interface RoadmapProgressMetricsDto {
+  totalTrackableNodes: number;
+  masteredNodesCount: number;
+  overallProgressPercentage: number;
+  essentialProgressPercentage: number;
+}
+
+export interface RoadmapProgressResponseDto {
+  id: string;
+  title: string;
+  careerTrack: CareerTrackSummaryDto;
+  hasResumeAnalyzed: boolean;
+  metrics: RoadmapProgressMetricsDto;
+  nodes: DynamicRoadmapNodeDto[];
+}

@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { AuthModule } from '../auth/auth.module.js';
 import { ProfilesModule } from '../profiles/profiles.module.js';
+import { ResumesModule } from '../resumes/resumes.module.js';
 import { CareerRoadmap } from './career-roadmap.entity.js';
 import { RoadmapNode } from './roadmap-node.entity.js';
 import { RoadmapsController } from './roadmaps.controller.js';
@@ -14,6 +15,7 @@ import { TypeOrmRoadmapsRepository } from './typeorm-roadmaps.repository.js';
     TypeOrmModule.forFeature([CareerRoadmap, RoadmapNode]),
     AuthModule,
     ProfilesModule,
+    ResumesModule,
   ],
   controllers: [RoadmapsController],
   providers: [
