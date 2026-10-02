@@ -144,6 +144,9 @@ jobs:
       (needs.changes.outputs.migrations == 'true' || inputs.force_run_migrations == true) &&
       (needs.deploy-infra.result == 'success' || needs.deploy-infra.result == 'skipped')
     runs-on: ubuntu-latest
+    env:
+      GCP_PROJECT: ${{ vars.GCP_PROJECT_ID || 'startintech' }}
+      GCP_REGION: ${{ vars.GCP_REGION || 'southamerica-east1' }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -152,6 +155,9 @@ jobs:
         uses: google-github-actions/auth@v2
         with:
           credentials_json: ${{ secrets.GCP_SA_KEY }}
+
+      - name: Set up Cloud SDK
+        uses: google-github-actions/setup-gcloud@v2
 
       - name: Setup Bun
         uses: oven-sh/setup-bun@v2
@@ -164,8 +170,85 @@ jobs:
       - name: Build @startintech/shared
         run: bun run build:shared
 
+      - name: Install Cloud SQL Auth Proxy
+        run: |
+          curl -sS -o cloud-sql-proxy https://storage.googleapis.com/cloud-sql-connectors/cloud-sql-proxy/v2.14.0/cloud-sql-proxy.linux.amd64
+          chmod +x cloud-sql-proxy
+          sudo mv cloud-sql-proxy /usr/local/bin/cloud-sql-proxy
+
       - name: Run TypeORM Migrations
-        run: bun --cwd Backend db:migrate
+        run: |
+          # 1. Resolve raw database URL from repository secrets or Secret Manager
+          RAW_DB_URL="${{ secrets.DATABASE_URL }}"
+          if [ -z "$RAW_DB_URL" ]; then
+            RAW_DB_URL=$(gcloud secrets versions access latest --secret="db_secret" --project="${{ env.GCP_PROJECT }}" 2>/dev/null || true)
+          fi
+
+          if [ -z "$RAW_DB_URL" ]; then
+            echo "::error::Could not resolve DATABASE_URL from Secret Manager (db_secret) or repository secrets."
+            exit 1
+          fi
+
+          # 2. Parse connection name and local TCP database URL
+          export RAW_DB_URL
+          eval $(bun -e '
+            const raw = process.env.RAW_DB_URL || "";
+            const match = raw.match(/[?&]host=\/cloudsql\/([^&]+)/);
+            const defaultConn = `${process.env.GCP_PROJECT}:${process.env.GCP_REGION}:startintech-db-instance`;
+            const conn = match ? match[1] : defaultConn;
+            let cleaned = raw
+              .replace(/[?&]host=\/cloudsql\/[^&]+/, "")
+              .replace(/\?$/, "");
+            if (cleaned.includes("&") && !cleaned.includes("?")) {
+              cleaned = cleaned.replace("&", "?");
+            }
+            cleaned = cleaned.replace(/@\//, "@127.0.0.1:5432/");
+            console.log("export CONNECTION_NAME=" + JSON.stringify(conn) + ";");
+            console.log("export MIGRATION_DB_URL=" + JSON.stringify(cleaned) + ";");
+          ')
+
+          echo "::add-mask::$RAW_DB_URL"
+          echo "::add-mask::$MIGRATION_DB_URL"
+
+          # 3. Stop pre-installed postgresql service on runner to prevent port collision
+          sudo systemctl stop postgresql 2>/dev/null || true
+
+          # 4. Start Cloud SQL Auth Proxy in background
+          echo "Starting Cloud SQL Auth Proxy for ${CONNECTION_NAME} on 127.0.0.1:5432..."
+          /usr/local/bin/cloud-sql-proxy \
+            --credentials-file "$GOOGLE_APPLICATION_CREDENTIALS" \
+            --port 5432 \
+            "$CONNECTION_NAME" > /tmp/cloud-sql-proxy.log 2>&1 &
+          PROXY_PID=$!
+
+          trap "echo 'Stopping Cloud SQL Auth Proxy...'; kill $PROXY_PID 2>/dev/null || true" EXIT
+
+          # 5. Wait for proxy to listen on port 5432
+          echo "Waiting for Cloud SQL Auth Proxy to become ready..."
+          READY=0
+          for i in {1..30}; do
+            if timeout 1 bash -c "</dev/tcp/127.0.0.1/5432" 2>/dev/null; then
+              echo "Cloud SQL Auth Proxy is ready."
+              READY=1
+              break
+            fi
+            if ! kill -0 $PROXY_PID 2>/dev/null; then
+              echo "::error::Cloud SQL Auth Proxy exited unexpectedly. Logs:"
+              cat /tmp/cloud-sql-proxy.log
+              exit 1
+            fi
+            sleep 1
+          done
+
+          if [ $READY -ne 1 ]; then
+            echo "::error::Timed out waiting for Cloud SQL Auth Proxy on port 5432. Logs:"
+            cat /tmp/cloud-sql-proxy.log
+            exit 1
+          fi
+
+          # 6. Run migrations against proxy
+          echo "Running TypeORM migrations..."
+          DATABASE_URL="$MIGRATION_DB_URL" bun --cwd Backend db:migrate
         env:
           NODE_ENV: production
 
