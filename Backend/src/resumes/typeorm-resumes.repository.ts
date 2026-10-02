@@ -41,23 +41,45 @@ export class TypeOrmResumesRepository implements ResumesRepository {
   async create(
     params: CreateResumeAnalysisParams,
   ): Promise<ResumeAnalysisRecord> {
-    const saved = await this.analyses.save(
-      this.analyses.create({
-        id: params.id,
-        fileUrl: params.fileUrl,
-        rawText: params.rawText,
-        atsScore: null,
-        feedbackReport: null,
-        user: { id: params.userId } as User,
-      }),
-    );
-    return {
-      id: saved.id,
-      userId: params.userId,
-      fileUrl: saved.fileUrl,
-      rawText: saved.rawText,
-      createdAt: saved.createdAt,
-    };
+    const entity = this.analyses.create({
+      id: params.id,
+      fileUrl: params.fileUrl,
+      rawText: params.rawText,
+      atsScore: null,
+      feedbackReport: null,
+      user: { id: params.userId } as User,
+    });
+
+    try {
+      const insertResult = await this.analyses.insert(entity as never);
+      const rawCreatedAt =
+        (insertResult.generatedMaps[0]?.createdAt as
+          | Date
+          | string
+          | undefined) ??
+        (insertResult.raw[0]?.created_at as Date | string | undefined);
+      const createdAt =
+        rawCreatedAt instanceof Date
+          ? rawCreatedAt
+          : rawCreatedAt
+            ? new Date(rawCreatedAt)
+            : new Date();
+
+      return {
+        id: entity.id,
+        userId: params.userId,
+        fileUrl: entity.fileUrl,
+        rawText: entity.rawText,
+        createdAt,
+      };
+    } catch (error) {
+      if (isUniqueViolation(error)) {
+        throw new ConflictException(
+          'Resume analysis already exists for this submission',
+        );
+      }
+      throw error;
+    }
   }
 
   async findByIdForUser(
