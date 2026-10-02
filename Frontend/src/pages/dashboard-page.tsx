@@ -1,3 +1,4 @@
+import { Link } from '@tanstack/react-router';
 import { useAuth } from '@/auth/use-auth';
 
 export function DashboardPage() {
@@ -39,6 +40,13 @@ export function DashboardPage() {
             Área principal em construção.
           </p>
         )}
+        <Link
+          to="/roadmap"
+          data-testid="dashboard-roadmap-link"
+          className="mt-6 inline-flex h-9 items-center justify-center rounded-4xl bg-brand-blue px-4 font-sans text-sm font-semibold text-white transition-colors hover:bg-brand-blue/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-blue/40"
+        >
+          Ver trilha
+        </Link>
       </section>
     </main>
   );
