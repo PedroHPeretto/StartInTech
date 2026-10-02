@@ -36,6 +36,7 @@ function mapNode(
     sequenceOrder: node.sequenceOrder,
     skillId: node.skillId,
     status: resolveStatus(node.skillId, presentSkillIds, hasResumeAnalyzed),
+    lessons: node.lessons ?? [],
     children: node.children.map((child) =>
       mapNode(child, presentSkillIds, hasResumeAnalyzed),
     ),

@@ -26,6 +26,16 @@ const ROADMAP_PROGRESS_BASE = {
       sequenceOrder: 1,
       skillId: null,
       status: 'NEUTRAL',
+      lessons: [
+        {
+          id: 'lesson-e2e-1',
+          title: 'O que é HTTP?',
+          description: 'Fundamentos de requisições web.',
+          readingTimeMinutes: 10,
+          url: 'https://roadmap.sh/packs/internet/what-is-http',
+          isFree: true,
+        },
+      ],
       children: [
         {
           id: 'dddddddd-dddd-4ddd-8ddd-ddddddddddd1',
@@ -35,6 +45,7 @@ const ROADMAP_PROGRESS_BASE = {
           sequenceOrder: 1,
           skillId: 'eeeeeeee-eeee-4eee-8eee-eeeeeeeeeee1',
           status: 'PENDING',
+          lessons: [],
           children: [],
         },
       ],
@@ -47,6 +58,7 @@ const ROADMAP_PROGRESS_BASE = {
       sequenceOrder: 2,
       skillId: null,
       status: 'NEUTRAL',
+      lessons: [],
       children: [],
     },
   ],
@@ -125,6 +137,7 @@ test.describe('career roadmap', () => {
     await essentialNode.getByRole('button').click();
 
     await expect(page.getByTestId('roadmap-node-children')).toBeVisible();
+    await expect(page.getByTestId('roadmap-lesson')).toContainText('O que é HTTP?');
     await expect(page.getByText('Lógica de programação')).toBeVisible();
     await expect(
       page.locator(
