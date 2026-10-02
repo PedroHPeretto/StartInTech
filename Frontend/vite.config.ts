@@ -6,6 +6,7 @@ import path from 'path'
 
 // https://vite.dev/config/
 export default defineConfig({
+  envDir: path.resolve(import.meta.dirname, '..'),
   plugins: [
     react(),
     babel({ presets: [reactCompilerPreset()] }),
@@ -14,6 +15,10 @@ export default defineConfig({
   resolve: {
     alias: {
       "@": path.resolve(import.meta.dirname, "./src"),
+      "@startintech/shared": path.resolve(
+        import.meta.dirname,
+        "../shared/dist/index.js",
+      ),
     },
     dedupe: ['react', 'react-dom'],
   },
