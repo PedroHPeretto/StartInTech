@@ -22,10 +22,17 @@ import { UsersModule } from './users/users.module.js';
           TypeOrmModule.forRootAsync({
             imports: [ConfigModule],
             inject: [ConfigService],
-            useFactory: () => ({
-              ...dataSourceOptions,
-              autoLoadEntities: true,
-            }),
+            useFactory: (config: ConfigService) => {
+              const url =
+                config.get<string>('DATABASE_URL') || process.env.DATABASE_URL;
+              return {
+                ...dataSourceOptions,
+                ...(url ? { url } : {}),
+                autoLoadEntities: true,
+                retryAttempts: 5,
+                retryDelay: 2000,
+              };
+            },
           }),
           UsersModule,
           AuthModule,
