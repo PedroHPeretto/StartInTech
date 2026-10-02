@@ -43,7 +43,9 @@ export class AiService {
       this.config.get<string>('OPENROUTER_API_KEY') ??
       process.env.OPENROUTER_API_KEY;
     if (!apiKey?.trim()) {
-      this.reportAndThrowGateway(new Error('OPENROUTER_API_KEY is not configured'));
+      this.reportAndThrowGateway(
+        new Error('OPENROUTER_API_KEY is not configured'),
+      );
     }
 
     const model =
@@ -122,7 +124,9 @@ export class AiService {
       }
     }
 
-    this.reportAndThrowGateway(new Error('OpenRouter request failed after retry'));
+    this.reportAndThrowGateway(
+      new Error('OpenRouter request failed after retry'),
+    );
   }
 
   private parseModelContent(content: string): AiSkillExtractionResult {

@@ -1,4 +1,7 @@
-import type { ExtractedSkillDto, SkillsExtractionResponseDto } from '@startintech/shared';
+import type {
+  ExtractedSkillDto,
+  SkillsExtractionResponseDto,
+} from '@startintech/shared';
 import { useParams } from '@tanstack/react-router';
 import axios from 'axios';
 import { Sparkles } from 'lucide-react';
@@ -23,10 +26,7 @@ function SkillBadgeList({
   panelTestId: string;
 }) {
   return (
-    <div
-      className="flex flex-wrap gap-2"
-      data-testid={panelTestId}
-    >
+    <div className="flex flex-wrap gap-2" data-testid={panelTestId}>
       {skills.map((skill) => (
         <Badge
           key={skill.id}
@@ -180,7 +180,10 @@ export function CurriculumAnalysisPage() {
         {isExtracting ? <SkillsExtractionSkeleton /> : null}
 
         {result && !isExtracting ? (
-          <div className="mt-8 space-y-6" data-testid="skills-extraction-result">
+          <div
+            className="mt-8 space-y-6"
+            data-testid="skills-extraction-result"
+          >
             <p className="text-center font-sans text-sm text-slate-600">
               Trilha:{' '}
               <span className="font-semibold text-brand-midnight">
