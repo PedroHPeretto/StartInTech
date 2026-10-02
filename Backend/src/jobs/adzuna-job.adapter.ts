@@ -37,8 +37,7 @@ interface AdzunaApiResponse {
 }
 
 const HYBRID_PATTERN = /\b(h[ií]brido|hybrid)\b/i;
-const REMOTE_PATTERN =
-  /\b(remoto|remote|home\s*office|trabalho\s*remoto)\b/i;
+const REMOTE_PATTERN = /\b(remoto|remote|home\s*office|trabalho\s*remoto)\b/i;
 
 export function stripHtmlTags(value: string): string {
   return value
@@ -73,7 +72,9 @@ export class AdzunaJobAdapter {
     return buildAdzunaSearchWhat(careerTrackName, careerTrackSlug);
   }
 
-  async searchJobs(context: AdzunaSearchContext): Promise<AdzunaJobListingInput[]> {
+  async searchJobs(
+    context: AdzunaSearchContext,
+  ): Promise<AdzunaJobListingInput[]> {
     const appId =
       this.config.get<string>('ADZUNA_APP_ID') ?? process.env.ADZUNA_APP_ID;
     const appKey =
@@ -88,9 +89,7 @@ export class AdzunaJobAdapter {
       context.careerTrackName,
       context.careerTrackSlug,
     );
-    const url = new URL(
-      `${ADZUNA_BASE_URL}/v1/api/jobs/br/search/${page}`,
-    );
+    const url = new URL(`${ADZUNA_BASE_URL}/v1/api/jobs/br/search/${page}`);
     url.searchParams.set('app_id', appId);
     url.searchParams.set('app_key', appKey);
     url.searchParams.set('what', what);

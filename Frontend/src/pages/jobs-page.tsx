@@ -60,28 +60,29 @@ export function JobsPage() {
   const [isLoadingMore, setIsLoadingMore] = useState(false);
   const [requestId, setRequestId] = useState(0);
 
+  const resetToFirstPage = () => {
+    setPage(1);
+    setStatus('loading');
+    setItems([]);
+    setHasNextPage(false);
+  };
+
   useEffect(() => {
     const timer = window.setTimeout(() => {
-      setDebouncedSearch(searchInput.trim());
+      const trimmed = searchInput.trim();
+      setDebouncedSearch((previous) => {
+        if (previous !== trimmed) {
+          resetToFirstPage();
+        }
+        return trimmed;
+      });
     }, SEARCH_DEBOUNCE_MS);
     return () => window.clearTimeout(timer);
   }, [searchInput]);
 
   useEffect(() => {
-    setPage(1);
-  }, [workplaceFilter, debouncedSearch]);
-
-  useEffect(() => {
     const controller = new AbortController();
     const isFirstPage = page === 1;
-
-    if (isFirstPage) {
-      setStatus('loading');
-      setItems([]);
-      setHasNextPage(false);
-    } else {
-      setIsLoadingMore(true);
-    }
 
     const workplaceType =
       workplaceFilter === 'all'
@@ -124,15 +125,14 @@ export function JobsPage() {
   }, [page, workplaceFilter, debouncedSearch, requestId]);
 
   const retry = () => {
-    setPage(1);
-    setStatus('loading');
+    resetToFirstPage();
     setRequestId((current) => current + 1);
   };
 
   const clearFilters = () => {
     setSearchInput('');
     setWorkplaceFilter('all');
-    setPage(1);
+    resetToFirstPage();
   };
 
   const hasActiveFilters =
@@ -165,6 +165,7 @@ export function JobsPage() {
           onChange={(selected) => {
             if (typeof selected === 'string') {
               setWorkplaceFilter(selected);
+              resetToFirstPage();
             }
           }}
         />
@@ -220,7 +221,10 @@ export function JobsPage() {
             type="button"
             variant="outline"
             disabled={isLoadingMore}
-            onClick={() => setPage((current) => current + 1)}
+            onClick={() => {
+              setIsLoadingMore(true);
+              setPage((current) => current + 1);
+            }}
             data-testid="jobs-load-more"
           >
             {isLoadingMore ? 'Carregando…' : 'Carregar mais'}

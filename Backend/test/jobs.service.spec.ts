@@ -58,7 +58,10 @@ class FakeJobsRepository implements JobsRepository {
   lastUpsertListings: AdzunaJobListingInput[] = [];
 
   constructor(
-    private readonly sequences: Array<{ total: number; items: JobListingRecord[] }>,
+    private readonly sequences: Array<{
+      total: number;
+      items: JobListingRecord[];
+    }>,
     private readonly cachedCount = 0,
   ) {}
 
@@ -118,7 +121,11 @@ function jobsService(
   repository: FakeJobsRepository,
   adzuna: FakeAdzunaAdapter,
 ): JobsService {
-  return new JobsService(profilesService(), adzuna as unknown as AdzunaJobAdapter, repository);
+  return new JobsService(
+    profilesService(),
+    adzuna as unknown as AdzunaJobAdapter,
+    repository,
+  );
 }
 
 describe('JobsService', () => {
@@ -196,10 +203,7 @@ describe('JobsService', () => {
   });
 
   it('throws 502 when Adzuna fails and there is no cached data', async () => {
-    const repository = new FakeJobsRepository(
-      [{ total: 0, items: [] }],
-      0,
-    );
+    const repository = new FakeJobsRepository([{ total: 0, items: [] }], 0);
     const adzuna = new FakeAdzunaAdapter();
     adzuna.error = new Error('Adzuna responded with status 503');
 

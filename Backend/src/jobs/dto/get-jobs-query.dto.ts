@@ -1,4 +1,7 @@
-import { WorkplaceType, type GetJobsQueryDto as SharedGetJobsQueryDto } from '@startintech/shared';
+import {
+  WorkplaceType,
+  type GetJobsQueryDto as SharedGetJobsQueryDto,
+} from '@startintech/shared';
 import { Type } from 'class-transformer';
 import {
   IsEnum,

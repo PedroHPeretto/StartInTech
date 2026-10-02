@@ -1,8 +1,4 @@
-import {
-  BadGatewayException,
-  Inject,
-  Injectable,
-} from '@nestjs/common';
+import { BadGatewayException, Inject, Injectable } from '@nestjs/common';
 import type {
   GetJobsQueryDto,
   PaginatedJobsResponseDto,
