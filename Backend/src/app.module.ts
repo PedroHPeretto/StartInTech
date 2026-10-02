@@ -5,7 +5,9 @@ import { SentryModule } from '@sentry/nestjs/setup';
 import 'reflect-metadata';
 import { AppController } from './app.controller.js';
 import { AuthModule } from './auth/auth.module.js';
+import { CareerTracksModule } from './career-tracks/career-tracks.module.js';
 import { dataSourceOptions } from './database/data-source.js';
+import { ProfilesModule } from './profiles/profiles.module.js';
 import { UsersModule } from './users/users.module.js';
 
 @Module({
@@ -27,6 +29,8 @@ import { UsersModule } from './users/users.module.js';
           }),
           UsersModule,
           AuthModule,
+          CareerTracksModule,
+          ProfilesModule,
         ]),
   ],
   controllers: [AppController],
