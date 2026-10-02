@@ -89,4 +89,8 @@ export async function submitResumeFile(
   });
 }
 
-export { ResumeSubmissionMode, RESUME_RAW_TEXT_MAX_LENGTH, RESUME_RAW_TEXT_MIN_LENGTH } from '@startintech/shared';
+export {
+  ResumeSubmissionMode,
+  RESUME_RAW_TEXT_MAX_LENGTH,
+  RESUME_RAW_TEXT_MIN_LENGTH,
+} from '@startintech/shared';

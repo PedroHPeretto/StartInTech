@@ -10,10 +10,7 @@ import { AlertBanner } from '@/components/feedback/alert-banner';
 import { Button } from '@/components/ui/button';
 import { Tabs } from '@/components/ui/tabs';
 import { UploadDropzone } from '@/components/upload/upload-dropzone';
-import {
-  submitResume,
-  submitResumeFile,
-} from '@/resumes/resume-api';
+import { submitResume, submitResumeFile } from '@/resumes/resume-api';
 
 const fieldClassName =
   'w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 font-sans text-sm text-brand-midnight shadow-2xs outline-none transition-all placeholder:text-slate-400 focus:border-brand-blue focus:ring-2 focus:ring-brand-blue/20 disabled:cursor-not-allowed disabled:bg-slate-50 disabled:opacity-60';
@@ -216,11 +213,14 @@ export function CurriculumUploadPage() {
                   className="font-sans text-xs text-muted-foreground"
                   data-testid="resume-char-count"
                 >
-                  {trimmedLength}/{RESUME_RAW_TEXT_MAX_LENGTH} caracteres (mínimo{' '}
-                  {RESUME_RAW_TEXT_MIN_LENGTH})
+                  {trimmedLength}/{RESUME_RAW_TEXT_MAX_LENGTH} caracteres
+                  (mínimo {RESUME_RAW_TEXT_MIN_LENGTH})
                 </p>
                 {submitError ? (
-                  <p className="font-sans text-sm text-destructive" role="alert">
+                  <p
+                    className="font-sans text-sm text-destructive"
+                    role="alert"
+                  >
                     {submitError}
                   </p>
                 ) : null}
