@@ -1,8 +1,19 @@
 import { ConflictException } from '@nestjs/common';
 import { describe, expect, it, vi } from 'vitest';
-import { QueryFailedError, type Repository } from 'typeorm';
+import { DataSource, QueryFailedError, type Repository } from 'typeorm';
 import type { ResumeAnalysis } from '../src/resumes/resume-analysis.entity.js';
 import { TypeOrmResumesRepository } from '../src/resumes/typeorm-resumes.repository.js';
+
+function createRepository(
+  analyses: Repository<ResumeAnalysis>,
+): TypeOrmResumesRepository {
+  return new TypeOrmResumesRepository(
+    analyses,
+    {} as Repository<never>,
+    {} as Repository<never>,
+    { transaction: vi.fn() } as unknown as DataSource,
+  );
+}
 
 describe('TypeOrmResumesRepository', () => {
   const params = {
@@ -24,7 +35,7 @@ describe('TypeOrmResumesRepository', () => {
       }),
     } as unknown as Repository<ResumeAnalysis>;
 
-    const repo = new TypeOrmResumesRepository(mockRepo);
+    const repo = createRepository(mockRepo);
     const result = await repo.create(params);
 
     expect(mockRepo.create).toHaveBeenCalledWith(
@@ -60,7 +71,7 @@ describe('TypeOrmResumesRepository', () => {
       insert: vi.fn().mockRejectedValue(uniqueError),
     } as unknown as Repository<ResumeAnalysis>;
 
-    const repo = new TypeOrmResumesRepository(mockRepo);
+    const repo = createRepository(mockRepo);
 
     await expect(repo.create(params)).rejects.toBeInstanceOf(ConflictException);
   });
@@ -73,7 +84,7 @@ describe('TypeOrmResumesRepository', () => {
       insert: vi.fn().mockRejectedValue(unexpectedError),
     } as unknown as Repository<ResumeAnalysis>;
 
-    const repo = new TypeOrmResumesRepository(mockRepo);
+    const repo = createRepository(mockRepo);
 
     await expect(repo.create(params)).rejects.toThrow(
       'Database connection lost',

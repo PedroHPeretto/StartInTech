@@ -66,4 +66,18 @@ export class GcsStorageService {
   buildFileUrl(fileKey: string): string {
     return `gs://${this.bucketName}/${fileKey}`;
   }
+
+  parseFileKeyFromGsUrl(fileUrl: string): string {
+    const prefix = `gs://${this.bucketName}/`;
+    if (!fileUrl.startsWith(prefix)) {
+      throw new Error('Unexpected file URL');
+    }
+    return fileUrl.slice(prefix.length);
+  }
+
+  async downloadObject(fileKey: string): Promise<Buffer> {
+    const file = this.storage.bucket(this.bucketName).file(fileKey);
+    const [contents] = await file.download();
+    return contents;
+  }
 }

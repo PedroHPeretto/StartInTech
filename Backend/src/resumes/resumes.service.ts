@@ -2,10 +2,12 @@ import {
   RESUME_MAX_FILE_SIZE_BYTES,
   RESUME_RAW_TEXT_MAX_LENGTH,
   RESUME_RAW_TEXT_MIN_LENGTH,
+  ResumeAnalysisSkillStatus,
   ResumeSubmissionMode,
   type GenerateUploadUrlDto,
   type ResumeSubmissionResponseDto,
   type ResumeUploadFileType,
+  type SkillsExtractionResponseDto,
   type SubmitResumeDto,
   type UploadUrlResponseDto,
 } from '@startintech/shared';
@@ -16,11 +18,26 @@ import {
   Inject,
   Injectable,
   NotFoundException,
+  UnprocessableEntityException,
 } from '@nestjs/common';
+import { AiService } from '../ai/ai.service.js';
+import {
+  PROFILES_REPOSITORY,
+  type ProfilesRepository,
+} from '../profiles/profiles.repository.js';
 import { GcsStorageService } from './gcs-storage.service.js';
+import {
+  extractTextFromDocx,
+  extractTextFromPdf,
+} from './resume-text-extractor.js';
+import {
+  dedupeSkillsByNormalizedName,
+  sanitizeSkillName,
+} from './skill-name.util.js';
 import {
   RESUMES_REPOSITORY,
   type ResumesRepository,
+  type SkillLinkInput,
 } from './resumes.repository.js';
 
 const PDF_MIME = 'application/pdf' as const;
@@ -35,7 +52,10 @@ export class ResumesService {
   constructor(
     @Inject(RESUMES_REPOSITORY)
     private readonly resumes: ResumesRepository,
+    @Inject(PROFILES_REPOSITORY)
+    private readonly profiles: ProfilesRepository,
     private readonly gcs: GcsStorageService,
+    private readonly ai: AiService,
   ) {}
 
   async generateUploadUrl(
@@ -84,6 +104,124 @@ export class ResumesService {
       return this.submitRawText(userId, dto.rawText);
     }
     throw new BadRequestException('Invalid submission mode');
+  }
+
+  async extractSkills(
+    userId: string,
+    resumeId: string,
+  ): Promise<SkillsExtractionResponseDto> {
+    const analysis = await this.resumes.findByIdForUser(resumeId, userId);
+    if (!analysis) {
+      throw new NotFoundException('Resume analysis not found');
+    }
+
+    const profile = await this.profiles.findByUserId(userId);
+    if (!profile) {
+      throw new UnprocessableEntityException(
+        'Complete your profile before analyzing',
+      );
+    }
+
+    const careerTrack = await this.profiles.findCareerTrackById(
+      profile.careerTrack.id,
+    );
+    if (!careerTrack) {
+      throw new UnprocessableEntityException('Career track not found');
+    }
+
+    const resumeText = await this.resolveResumeText(analysis);
+    const trimmedText = resumeText.trim();
+    if (trimmedText.length < RESUME_RAW_TEXT_MIN_LENGTH) {
+      throw new UnprocessableEntityException(
+        'Resume text is too short to analyze',
+      );
+    }
+
+    const aiResult = await this.ai.extractSkillsFromResume(trimmedText, {
+      name: careerTrack.name,
+      slug: careerTrack.slug,
+      description: careerTrack.description,
+    });
+
+    if (aiResult.insufficientText) {
+      throw new UnprocessableEntityException(
+        'Resume text is insufficient for skill extraction',
+      );
+    }
+
+    const detected = dedupeSkillsByNormalizedName(aiResult.detectedSkills)
+      .map((skill) => ({
+        name: sanitizeSkillName(skill.name),
+        category: skill.category,
+        status: ResumeAnalysisSkillStatus.PRESENT,
+      }))
+      .filter((skill) => skill.name.length > 0);
+
+    const missing = dedupeSkillsByNormalizedName(aiResult.missingSkills)
+      .map((skill) => ({
+        name: sanitizeSkillName(skill.name),
+        category: skill.category,
+        status: ResumeAnalysisSkillStatus.MISSING_GAP,
+      }))
+      .filter((skill) => skill.name.length > 0);
+
+    const links: SkillLinkInput[] = [...detected, ...missing];
+    const persisted = await this.resumes.persistSkillExtraction(
+      analysis.id,
+      links,
+    );
+
+    return {
+      resumeId: analysis.id,
+      careerTrack: {
+        id: careerTrack.id,
+        name: careerTrack.name,
+        slug: careerTrack.slug,
+      },
+      skills: {
+        detected: persisted.detected,
+        missing: persisted.missing,
+      },
+      totalDetected: persisted.detected.length,
+      totalMissing: persisted.missing.length,
+    };
+  }
+
+  private async resolveResumeText(analysis: {
+    rawText: string | null;
+    fileUrl: string | null;
+  }): Promise<string> {
+    if (analysis.rawText?.trim()) {
+      return analysis.rawText;
+    }
+
+    if (!analysis.fileUrl) {
+      return '';
+    }
+
+    let fileKey: string;
+    try {
+      fileKey = this.gcs.parseFileKeyFromGsUrl(analysis.fileUrl);
+    } catch {
+      throw new BadGatewayException('Failed to read resume file');
+    }
+
+    let buffer: Buffer;
+    try {
+      buffer = await this.gcs.downloadObject(fileKey);
+    } catch {
+      throw new BadGatewayException('Failed to download resume file');
+    }
+
+    const lowerKey = fileKey.toLowerCase();
+    if (lowerKey.endsWith('.pdf')) {
+      return extractTextFromPdf(buffer);
+    }
+    if (lowerKey.endsWith('.docx')) {
+      return extractTextFromDocx(buffer);
+    }
+
+    throw new BadRequestException('Unsupported resume file type');
   }
 
   private async submitFileUpload(
