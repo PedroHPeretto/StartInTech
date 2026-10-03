@@ -107,6 +107,11 @@ resource "google_secret_manager_secret" "openrouter_api_key" {
 resource "google_secret_manager_secret_version" "openrouter_api_key_version" {
   secret      = google_secret_manager_secret.openrouter_api_key.id
   secret_data = var.openrouter_api_key
+
+  # Real values are seeded outside CI. Applying the placeholder would publish a new latest version.
+  lifecycle {
+    ignore_changes = [secret_data]
+  }
 }
 
 # Google OAuth 2.0 Client ID
@@ -121,6 +126,10 @@ resource "google_secret_manager_secret" "oauth_client_id" {
 resource "google_secret_manager_secret_version" "oauth_client_id_version" {
   secret      = google_secret_manager_secret.oauth_client_id.id
   secret_data = var.oauth_client_id
+
+  lifecycle {
+    ignore_changes = [secret_data]
+  }
 }
 
 # Google OAuth 2.0 Client Secret
@@ -135,6 +144,10 @@ resource "google_secret_manager_secret" "oauth_client_secret" {
 resource "google_secret_manager_secret_version" "oauth_client_secret_version" {
   secret      = google_secret_manager_secret.oauth_client_secret.id
   secret_data = var.oauth_client_secret
+
+  lifecycle {
+    ignore_changes = [secret_data]
+  }
 }
 
 # Adzuna Jobs API — App ID
@@ -149,6 +162,10 @@ resource "google_secret_manager_secret" "adzuna_app_id" {
 resource "google_secret_manager_secret_version" "adzuna_app_id_version" {
   secret      = google_secret_manager_secret.adzuna_app_id.id
   secret_data = var.adzuna_app_id
+
+  lifecycle {
+    ignore_changes = [secret_data]
+  }
 }
 
 # Adzuna Jobs API — App Key
@@ -163,4 +180,8 @@ resource "google_secret_manager_secret" "adzuna_app_key" {
 resource "google_secret_manager_secret_version" "adzuna_app_key_version" {
   secret      = google_secret_manager_secret.adzuna_app_key.id
   secret_data = var.adzuna_app_key
+
+  lifecycle {
+    ignore_changes = [secret_data]
+  }
 }

@@ -11,7 +11,8 @@ variable "region" {
 variable "openrouter_api_key" {
   type        = string
   sensitive   = true
-  description = "OpenRouter API Key for AI resume analysis"
+  description = "OpenRouter API Key for AI resume analysis. CI does not prompt for this; secret versions ignore secret_data so the placeholder does not rotate the production key."
+  default     = "placeholder-openrouter-api-key"
 }
 
 variable "oauth_client_id" {
