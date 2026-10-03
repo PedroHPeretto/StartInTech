@@ -80,6 +80,10 @@ test('completa o onboarding e mostra nome e carreira no dashboard', async ({
   await page.getByTestId('google-login-button').click();
 
   await expect(page).toHaveURL(/\/onboarding$/);
+  await expect(page.getByTestId('app-shell')).toBeVisible();
+  await expect(page.getByTestId('sidebar')).toBeVisible();
+  await expect(page.getByTestId('page-header')).toBeVisible();
+  await expect(page.getByTestId('page-footer')).toBeVisible();
   await expect(page.getByRole('heading', { name: 'Onboarding' })).toBeVisible();
 
   await page.getByLabel('Nome completo').fill(FULL_NAME);
@@ -95,4 +99,9 @@ test('completa o onboarding e mostra nome e carreira no dashboard', async ({
   await expect(page.getByTestId('dashboard-career-name')).toHaveText(
     'Desenvolvimento de Software',
   );
+  await expect(page.getByTestId('sidebar-user')).toContainText(FULL_NAME);
+
+  await page.getByTestId('sidebar-logout-btn').click();
+  await expect(page).toHaveURL(/\/login$/);
+  await expect(page.getByTestId('app-shell')).toHaveCount(0);
 });

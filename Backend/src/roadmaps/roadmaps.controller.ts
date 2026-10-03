@@ -1,5 +1,8 @@
 import { Controller, Get, Req, UseGuards } from '@nestjs/common';
-import type { RoadmapDetailResponseDto } from '@startintech/shared';
+import type {
+  RoadmapDetailResponseDto,
+  RoadmapProgressResponseDto,
+} from '@startintech/shared';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard.js';
 import { RoadmapsService } from './roadmaps.service.js';
 
@@ -20,5 +23,13 @@ export class RoadmapsController {
     @Req() request: AuthenticatedRequest,
   ): Promise<RoadmapDetailResponseDto> {
     return this.roadmapsService.getMyTrack(request.user.userId);
+  }
+
+  @Get('my-track/progress')
+  @UseGuards(JwtAuthGuard)
+  getMyTrackProgress(
+    @Req() request: AuthenticatedRequest,
+  ): Promise<RoadmapProgressResponseDto> {
+    return this.roadmapsService.getMyTrackProgress(request.user.userId);
   }
 }

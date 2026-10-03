@@ -1,17 +1,20 @@
 import {
+  DynamicRoadmapNodeStatus,
   SkillPriority,
-  type RoadmapDetailResponseDto,
-  type RoadmapNodeResponseDto,
+  type DynamicRoadmapNodeDto,
+  type RoadmapProgressResponseDto,
 } from '@startintech/shared';
 import axios from 'axios';
-import { ChevronDown } from 'lucide-react';
+import { useNavigate } from '@tanstack/react-router';
+import { Check, ChevronDown } from 'lucide-react';
 import { useEffect, useState, type ReactNode } from 'react';
 import { BrandHeader } from '@/components/brand/brand-header';
 import { AlertBanner } from '@/components/feedback/alert-banner';
+import { CareerTrailProgress } from '@/components/metrics/career-progress';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { cn } from '@/lib/utils';
-import { fetchMyTrackRoadmap } from '@/roadmaps/roadmap-api';
+import { fetchMyTrackProgress } from '@/roadmaps/roadmap-api';
 
 type RoadmapLoadStatus = 'loading' | 'ready' | 'missing' | 'error';
 
@@ -36,6 +39,33 @@ const PRIORITY_BADGE: Record<
   },
 };
 
+const STATUS_PRESENTATION: Record<
+  DynamicRoadmapNodeStatus,
+  {
+    badgeLabel: string | null;
+    badgeClassName: string;
+    cardClassName: string;
+  }
+> = {
+  [DynamicRoadmapNodeStatus.MASTERED]: {
+    badgeLabel: 'Dominado',
+    badgeClassName:
+      'border-emerald-200 bg-emerald-50 font-semibold text-emerald-800 hover:bg-emerald-50',
+    cardClassName: 'border-emerald-200/80 bg-emerald-50/40',
+  },
+  [DynamicRoadmapNodeStatus.PENDING]: {
+    badgeLabel: 'Pendente de Estudo',
+    badgeClassName:
+      'border-amber-200 bg-amber-50 font-medium text-amber-900 hover:bg-amber-50',
+    cardClassName: 'border-amber-100/90 bg-amber-50/30',
+  },
+  [DynamicRoadmapNodeStatus.NEUTRAL]: {
+    badgeLabel: null,
+    badgeClassName: '',
+    cardClassName: 'border-border bg-white',
+  },
+};
+
 function RoadmapPriorityBadge({ priority }: { priority: SkillPriority }) {
   const presentation = PRIORITY_BADGE[priority];
 
@@ -46,15 +76,44 @@ function RoadmapPriorityBadge({ priority }: { priority: SkillPriority }) {
   );
 }
 
+function countDescendantTrackable(node: DynamicRoadmapNodeDto): {
+  mastered: number;
+  trackable: number;
+} {
+  const visit = (
+    items: DynamicRoadmapNodeDto[],
+    acc: { mastered: number; trackable: number },
+  ) => {
+    for (const item of items) {
+      if (item.skillId !== null) {
+        acc.trackable += 1;
+        if (item.status === DynamicRoadmapNodeStatus.MASTERED) {
+          acc.mastered += 1;
+        }
+      }
+      visit(item.children, acc);
+    }
+    return acc;
+  };
+
+  return visit(node.children, { mastered: 0, trackable: 0 });
+}
+
 function RoadmapNodeHeading({
   node,
   expandable,
   open,
 }: {
-  node: RoadmapNodeResponseDto;
+  node: DynamicRoadmapNodeDto;
   expandable: boolean;
   open: boolean;
 }) {
+  const statusStyle = STATUS_PRESENTATION[node.status];
+  const descendantProgress =
+    node.status === DynamicRoadmapNodeStatus.NEUTRAL
+      ? countDescendantTrackable(node)
+      : null;
+
   return (
     <div className="flex w-full items-start gap-3 text-left">
       {expandable ? (
@@ -67,12 +126,38 @@ function RoadmapNodeHeading({
         />
       ) : null}
       <div className="min-w-0 flex-1">
-        <p className="font-heading text-base font-bold text-brand-midnight">
-          {node.title}
-        </p>
+        <div className="flex flex-wrap items-center gap-2">
+          <p className="font-heading text-base font-bold text-brand-midnight">
+            {node.title}
+          </p>
+          {node.status === DynamicRoadmapNodeStatus.MASTERED ? (
+            <Check
+              aria-hidden
+              className="size-4 shrink-0 text-emerald-600"
+              data-testid="roadmap-node-mastered-icon"
+            />
+          ) : null}
+          {statusStyle.badgeLabel ? (
+            <Badge
+              className={cn('shrink-0', statusStyle.badgeClassName)}
+              data-testid="roadmap-node-status-badge"
+            >
+              {statusStyle.badgeLabel}
+            </Badge>
+          ) : null}
+        </div>
         {node.description ? (
           <p className="mt-1 font-sans text-sm leading-relaxed text-muted-foreground">
             {node.description}
+          </p>
+        ) : null}
+        {descendantProgress && descendantProgress.trackable > 0 ? (
+          <p
+            className="mt-2 font-sans text-xs text-slate-500"
+            data-testid="roadmap-node-subtopic-progress"
+          >
+            {descendantProgress.mastered} de {descendantProgress.trackable}{' '}
+            sub-tópicos concluídos
           </p>
         ) : null}
       </div>
@@ -81,16 +166,21 @@ function RoadmapNodeHeading({
   );
 }
 
-function RoadmapNodeItem({ node }: { node: RoadmapNodeResponseDto }) {
+function RoadmapNodeItem({ node }: { node: DynamicRoadmapNodeDto }) {
   const [open, setOpen] = useState(false);
   const hasChildren = node.children.length > 0;
   const childrenId = `roadmap-children-${node.id}`;
+  const statusStyle = STATUS_PRESENTATION[node.status];
 
   return (
     <li
-      className="rounded-2xl border border-border bg-white p-4 shadow-2xs"
+      className={cn(
+        'rounded-2xl border p-4 shadow-2xs',
+        statusStyle.cardClassName,
+      )}
       data-testid="roadmap-node"
       data-node-id={node.id}
+      data-node-status={node.status}
     >
       {hasChildren ? (
         <button
@@ -142,7 +232,7 @@ function RoadmapSkeleton() {
 
 function RoadmapPageShell({ children }: { children: ReactNode }) {
   return (
-    <main className="min-h-screen bg-brand-light-gray px-4 py-8 sm:py-10">
+    <main className="flex flex-1 flex-col bg-brand-blue px-4 py-8 sm:py-10">
       <div className="mx-auto w-full max-w-3xl rounded-2xl border border-border bg-background p-6 shadow-sm sm:p-8">
         <div className="mb-8 flex justify-center">
           <BrandHeader href={undefined} showTagline />
@@ -154,14 +244,17 @@ function RoadmapPageShell({ children }: { children: ReactNode }) {
 }
 
 export function RoadmapPage() {
-  const [roadmap, setRoadmap] = useState<RoadmapDetailResponseDto | null>(null);
+  const navigate = useNavigate();
+  const [roadmap, setRoadmap] = useState<RoadmapProgressResponseDto | null>(
+    null,
+  );
   const [status, setStatus] = useState<RoadmapLoadStatus>('loading');
   const [requestId, setRequestId] = useState(0);
 
   useEffect(() => {
     const controller = new AbortController();
 
-    fetchMyTrackRoadmap(controller.signal)
+    fetchMyTrackProgress(controller.signal)
       .then((data) => {
         if (controller.signal.aborted) {
           return;
@@ -242,11 +335,31 @@ export function RoadmapPage() {
               {roadmap.careerTrack.name}
             </span>
           </p>
-          {roadmap.description ? (
-            <p className="mx-auto mt-3 max-w-2xl text-center font-sans text-sm leading-relaxed text-muted-foreground">
-              {roadmap.description}
-            </p>
+
+          {!roadmap.hasResumeAnalyzed ? (
+            <div className="mt-6" data-testid="roadmap-upload-banner">
+              <AlertBanner
+                variant="info"
+                message="Envie o seu currículo para mapear automaticamente o seu progresso nesta trilha"
+                actionLabel="Enviar currículo"
+                onAction={() => navigate({ to: '/curriculum/upload' })}
+              />
+            </div>
           ) : null}
+
+          <div className="mt-8 flex flex-col gap-4">
+            <CareerTrailProgress
+              title="Progresso na Trilha"
+              completedTopics={roadmap.metrics.masteredNodesCount}
+              totalTopics={roadmap.metrics.totalTrackableNodes}
+              percentage={roadmap.metrics.overallProgressPercentage}
+            />
+            <CareerTrailProgress
+              title="Competências Essenciais Dominadas"
+              percentage={roadmap.metrics.essentialProgressPercentage}
+              showTopicSummary={false}
+            />
+          </div>
 
           <ul className="mt-8 flex flex-col gap-3">
             {roadmap.nodes.map((node) => (

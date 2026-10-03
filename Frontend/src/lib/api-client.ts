@@ -1,5 +1,5 @@
 import axios from 'axios';
-import { getAccessToken } from '@/auth/auth-token';
+import { getAccessToken, notifySessionUnauthorized } from '@/auth/auth-token';
 
 const baseURL = import.meta.env.VITE_API_URL ?? '';
 
@@ -17,3 +17,26 @@ apiClient.interceptors.request.use((config) => {
   }
   return config;
 });
+
+apiClient.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    if (!axios.isAxiosError(error) || error.response?.status !== 401) {
+      return Promise.reject(error);
+    }
+
+    const headers = error.config?.headers;
+    const authorization =
+      headers && typeof headers === 'object' && 'Authorization' in headers
+        ? headers.Authorization
+        : headers && typeof headers.get === 'function'
+          ? headers.get('Authorization')
+          : undefined;
+
+    if (authorization) {
+      notifySessionUnauthorized();
+    }
+
+    return Promise.reject(error);
+  },
+);

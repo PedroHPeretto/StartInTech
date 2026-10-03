@@ -1,55 +1,125 @@
 import { BadGatewayException } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
-import {
-  EmploymentType,
-  SeniorityLevel,
-  WorkplaceType,
-} from '@startintech/shared';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { JobSortBy, SeniorityLevel, WorkplaceType } from '@startintech/shared';
 import * as Sentry from '@sentry/nestjs';
-import type { ProfilesRepository } from '../src/profiles/profiles.repository.js';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+import type {
+  ProfileRecord,
+  ProfilesRepository,
+} from '../src/profiles/profiles.repository.js';
 import { ProfilesService } from '../src/profiles/profiles.service.js';
-import {
-  inferEmploymentType,
-  inferWorkplaceType,
-  JobsService,
-  mapAdzunaJob,
-} from '../src/jobs/jobs.service.js';
+import type { AdzunaJobListingInput } from '../src/jobs/adzuna-job.adapter.js';
+import { AdzunaJobAdapter } from '../src/jobs/adzuna-job.adapter.js';
+import { JobMatchingService } from '../src/jobs/job-matching.service.js';
+import type {
+  JobListingRecord,
+  JobsRepository,
+  ListJobsFilterParams,
+} from '../src/jobs/jobs.repository.js';
+import { JobsService } from '../src/jobs/jobs.service.js';
+import type { ResumesService } from '../src/resumes/resumes.service.js';
 
 vi.mock('@sentry/nestjs', () => ({
   captureException: vi.fn(),
 }));
 
 const USER_ID = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
+const CAREER_TRACK = {
+  id: '11111111-1111-4111-8111-111111111111',
+  name: 'Desenvolvimento de Software',
+  slug: 'software-development',
+};
 
-const PROFILE = {
+const PROFILE: ProfileRecord = {
   id: 'profile-1',
   userId: USER_ID,
   fullName: 'Ana Silva',
   seniorityLevel: SeniorityLevel.JUNIOR,
   bio: null,
-  careerTrack: {
-    id: '11111111-1111-4111-8111-111111111111',
-    name: 'Desenvolvimento de Software',
-    slug: 'software-development',
-  },
-  isProfileComplete: true,
+  careerTrack: CAREER_TRACK,
 };
 
-function createConfig(
-  overrides: Partial<{ appId: string; appKey: string }> = {},
-): ConfigService {
+function jobRecord(
+  id: string,
+  title: string,
+  options?: {
+    createdAt?: Date;
+    requirements?: JobListingRecord['requirements'];
+  },
+): JobListingRecord {
   return {
-    get: (key: string) => {
-      if (key === 'ADZUNA_APP_ID') {
-        return overrides.appId ?? 'test-app-id';
-      }
-      if (key === 'ADZUNA_APP_KEY') {
-        return overrides.appKey ?? 'test-app-key';
-      }
-      return undefined;
+    id,
+    title,
+    company: 'Acme',
+    location: 'São Paulo',
+    workplaceType: WorkplaceType.ON_SITE,
+    description: 'Desc',
+    applicationUrl: `https://example.com/${id}`,
+    createdAt: options?.createdAt ?? new Date('2025-01-01T00:00:00.000Z'),
+    careerTrack: {
+      id: CAREER_TRACK.id,
+      name: CAREER_TRACK.name,
     },
-  } as ConfigService;
+    requirements: options?.requirements ?? [],
+  };
+}
+
+class FakeJobsRepository implements JobsRepository {
+  findAllCalls = 0;
+  upsertCalls = 0;
+  lastUpsertListings: AdzunaJobListingInput[] = [];
+
+  constructor(
+    private readonly sequences: JobListingRecord[][],
+    private readonly cachedCount = 0,
+  ) {}
+
+  countActiveByCareerTrack(): Promise<number> {
+    return Promise.resolve(this.cachedCount);
+  }
+
+  findAllForListing(
+    _params: ListJobsFilterParams,
+  ): Promise<JobListingRecord[]> {
+    this.findAllCalls += 1;
+    const next = this.sequences.shift();
+    return Promise.resolve(next ?? []);
+  }
+
+  upsertMany(
+    _careerTrackId: string,
+    listings: AdzunaJobListingInput[],
+  ): Promise<void> {
+    this.upsertCalls += 1;
+    this.lastUpsertListings = listings;
+    return Promise.resolve();
+  }
+}
+
+class FakeAdzunaAdapter {
+  searchCalls = 0;
+  listings: AdzunaJobListingInput[] = [];
+  error: Error | null = null;
+
+  searchJobs(): Promise<AdzunaJobListingInput[]> {
+    this.searchCalls += 1;
+    if (this.error) {
+      return Promise.reject(this.error);
+    }
+    return Promise.resolve(this.listings);
+  }
+}
+
+class FakeResumesService {
+  constructor(
+    private readonly result: {
+      hasResumeAnalyzed: boolean;
+      presentSkillIds: string[];
+    },
+  ) {}
+
+  findLatestPresentSkills() {
+    return Promise.resolve(this.result);
+  }
 }
 
 function profilesService(): ProfilesService {
@@ -61,131 +131,195 @@ function profilesService(): ProfilesService {
   return new ProfilesService(repository);
 }
 
-const ADZUNA_FIXTURE = {
-  results: [
-    {
-      id: '12345',
-      title: 'Desenvolvedor JavaScript Junior',
-      description: 'Vaga remota para desenvolvimento web.',
-      created: '2026-01-15T00:00:00Z',
-      redirect_url: 'https://example.com/apply/12345',
-      salary_min: 4000,
-      salary_max: 6000,
-      contract_time: 'full_time',
-      contract_type: 'permanent',
-      company: { display_name: 'Acme Tech' },
-      location: { display_name: 'São Paulo, SP' },
-    },
-    {
-      id: '67890',
-      title: 'Estágio em QA',
-      description: 'Presencial em Curitiba.',
-      created: '2026-01-10T00:00:00Z',
-      redirect_url: 'https://example.com/apply/67890',
-      company: { display_name: 'QA Corp' },
-      location: { display_name: 'Curitiba, PR' },
-    },
-  ],
-};
+function jobsService(
+  repository: FakeJobsRepository,
+  adzuna: FakeAdzunaAdapter,
+  resumes: FakeResumesService = new FakeResumesService({
+    hasResumeAnalyzed: false,
+    presentSkillIds: [],
+  }),
+): JobsService {
+  return new JobsService(
+    profilesService(),
+    resumes as unknown as ResumesService,
+    new JobMatchingService(),
+    adzuna as unknown as AdzunaJobAdapter,
+    repository,
+  );
+}
 
 describe('JobsService', () => {
   beforeEach(() => {
     vi.clearAllMocks();
   });
 
-  it('maps Adzuna results to shared job DTOs', () => {
-    const mapped = mapAdzunaJob(ADZUNA_FIXTURE.results[0]);
-    expect(mapped).toEqual({
-      id: '12345',
-      title: 'Desenvolvedor JavaScript Junior',
-      company: 'Acme Tech',
-      location: 'São Paulo, SP',
-      workplaceType: WorkplaceType.REMOTE,
-      employmentType: EmploymentType.FULL_TIME,
-      salaryMin: 4000,
-      salaryMax: 6000,
-      description: 'Vaga remota para desenvolvimento web.',
-      applyUrl: 'https://example.com/apply/12345',
-      postedAt: '2026-01-15T00:00:00Z',
+  it('returns cached results without calling Adzuna when the page is fully covered', async () => {
+    const repository = new FakeJobsRepository([
+      Array.from({ length: 12 }, (_, index) =>
+        jobRecord(`job-${index}`, `Role ${index}`),
+      ),
+    ]);
+    const adzuna = new FakeAdzunaAdapter();
+    const service = jobsService(repository, adzuna);
+
+    const response = await service.listJobs(USER_ID, { page: 1, limit: 10 });
+
+    expect(adzuna.searchCalls).toBe(0);
+    expect(repository.upsertCalls).toBe(0);
+    expect(repository.findAllCalls).toBe(1);
+    expect(response.items).toHaveLength(10);
+    expect(response.meta).toEqual({
+      total: 12,
+      page: 1,
+      limit: 10,
+      totalPages: 2,
+      hasNextPage: true,
     });
+    expect(response.items[0]?.match).toBeNull();
+    expect(response.items[0]?.requirements).toEqual([]);
   });
 
-  it('detects internship roles from Portuguese keywords', () => {
-    const job = ADZUNA_FIXTURE.results[1];
-    const text = `${job.title} ${job.description}`;
-    expect(inferEmploymentType(job, text)).toBe(EmploymentType.INTERNSHIP);
-    expect(inferWorkplaceType(text)).toBe(WorkplaceType.ON_SITE);
-  });
-
-  it('throws BadGateway when credentials are missing', async () => {
-    const service = new JobsService(
-      createConfig({ appId: '', appKey: '' }),
-      profilesService(),
+  it('calls Adzuna on cache miss, upserts listings, and re-queries', async () => {
+    const repository = new FakeJobsRepository(
+      [
+        [jobRecord('job-1', 'Junior Dev')],
+        [jobRecord('job-2', 'Frontend Dev')],
+      ],
+      15,
     );
+    const adzuna = new FakeAdzunaAdapter();
+    adzuna.listings = [
+      {
+        title: 'Frontend Dev',
+        company: 'Beta',
+        location: 'Remoto',
+        workplaceType: WorkplaceType.REMOTE,
+        description: 'React',
+        applicationUrl: 'https://example.com/job-2',
+      },
+    ];
 
-    await expect(service.search(USER_ID, {})).rejects.toThrow(
-      BadGatewayException,
-    );
-    expect(Sentry.captureException).toHaveBeenCalled();
+    const service = jobsService(repository, adzuna);
+    const response = await service.listJobs(USER_ID, { page: 1, limit: 10 });
+
+    expect(adzuna.searchCalls).toBe(1);
+    expect(repository.upsertCalls).toBe(1);
+    expect(repository.lastUpsertListings).toEqual(adzuna.listings);
+    expect(repository.findAllCalls).toBe(2);
+    expect(response.meta.total).toBe(1);
+    expect(response.items[0]?.title).toBe('Frontend Dev');
   });
 
-  it('throws BadGateway when Adzuna responds with an error', async () => {
-    const fetchMock = vi.fn().mockResolvedValue({
-      ok: false,
-      status: 503,
-    });
-    const service = new JobsService(createConfig(), profilesService());
-    service.fetchImpl = fetchMock;
-
-    await expect(service.search(USER_ID, {})).rejects.toThrow(
-      BadGatewayException,
+  it('returns stale cache and reports to Sentry when Adzuna fails but rows exist', async () => {
+    const repository = new FakeJobsRepository(
+      [[jobRecord('job-1', 'Cached role')]],
+      3,
     );
+    const adzuna = new FakeAdzunaAdapter();
+    adzuna.error = new Error('Adzuna responded with status 503');
+
+    const service = jobsService(repository, adzuna);
+    const response = await service.listJobs(USER_ID, { page: 1, limit: 10 });
+
+    expect(Sentry.captureException).toHaveBeenCalledTimes(1);
+    expect(response.meta.total).toBe(1);
+    expect(response.items).toHaveLength(1);
   });
 
-  it('builds a junior keyword from the career slug and filters workplace type', async () => {
-    const fetchMock = vi.fn().mockResolvedValue({
-      ok: true,
-      status: 200,
-      json: async () => ADZUNA_FIXTURE,
-    });
-    const service = new JobsService(createConfig(), profilesService());
-    service.fetchImpl = fetchMock;
+  it('throws 502 when Adzuna fails and there is no cached data', async () => {
+    const repository = new FakeJobsRepository([[]], 0);
+    const adzuna = new FakeAdzunaAdapter();
+    adzuna.error = new Error('Adzuna responded with status 503');
 
-    const result = await service.search(USER_ID, {
-      workplaceType: WorkplaceType.REMOTE,
-    });
+    const service = jobsService(repository, adzuna);
 
-    const calledUrl = fetchMock.mock.calls[0]?.[0] as string;
-    expect(calledUrl).toContain('what=desenvolvedor');
-    expect(calledUrl).toContain('junior');
-    expect(result.jobs).toHaveLength(1);
-    expect(result.jobs[0]?.id).toBe('12345');
+    await expect(
+      service.listJobs(USER_ID, { page: 1, limit: 10 }),
+    ).rejects.toBeInstanceOf(BadGatewayException);
+    expect(Sentry.captureException).toHaveBeenCalledTimes(1);
   });
 
-  it('uses estágio for internship seniority in the default keyword', async () => {
-    const internshipProfile = {
-      ...PROFILE,
-      seniorityLevel: SeniorityLevel.INTERNSHIP,
-    };
-    const repository: ProfilesRepository = {
-      findCareerTrackById: () => Promise.resolve(null),
-      findByUserId: () => Promise.resolve(internshipProfile),
-      create: () => Promise.reject(new Error('not used')),
-    };
-    const fetchMock = vi.fn().mockResolvedValue({
-      ok: true,
-      status: 200,
-      json: async () => ({ results: [] }),
+  it('sorts by match score descending and keeps null matches last', async () => {
+    const skillA = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaa0001';
+    const skillB = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbb001';
+    const skillC = 'cccccccc-cccc-4ccc-8ccc-cccccccc0001';
+    const repository = new FakeJobsRepository([
+      [
+        jobRecord('low', 'Low Match', {
+          requirements: [
+            { id: skillA, name: 'A', isMandatory: true },
+            { id: skillC, name: 'C', isMandatory: false },
+          ],
+        }),
+        jobRecord('high', 'High Match', {
+          requirements: [{ id: skillA, name: 'A', isMandatory: true }],
+        }),
+      ],
+    ]);
+    const resumes = new FakeResumesService({
+      hasResumeAnalyzed: true,
+      presentSkillIds: [skillA, skillB],
     });
-    const service = new JobsService(
-      createConfig(),
-      new ProfilesService(repository),
-    );
-    service.fetchImpl = fetchMock;
+    const service = jobsService(repository, new FakeAdzunaAdapter(), resumes);
 
-    await service.search(USER_ID, {});
+    const response = await service.listJobs(USER_ID, {
+      sortBy: JobSortBy.MATCH_SCORE,
+      limit: 2,
+    });
 
-    const calledUrl = decodeURIComponent(fetchMock.mock.calls[0]?.[0] as string);
-    expect(calledUrl).toContain('estágio');
+    expect(response.items.map((item) => item.title)).toEqual([
+      'High Match',
+      'Low Match',
+    ]);
+    expect(response.items[0]?.match?.score).toBe(100);
+    expect(response.items[1]?.match?.score).toBe(75);
+  });
+
+  it('filters to only high-compatibility jobs when requested', async () => {
+    const skillMandatory = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaa0001';
+    const skillGap = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbb001';
+    const repository = new FakeJobsRepository([
+      [
+        jobRecord('seal', 'Seal Job', {
+          requirements: [
+            { id: skillMandatory, name: 'Core', isMandatory: true },
+          ],
+        }),
+        jobRecord('no-seal', 'No Seal Job', {
+          requirements: [
+            { id: skillMandatory, name: 'Core', isMandatory: true },
+            { id: skillGap, name: 'Gap', isMandatory: true },
+          ],
+        }),
+      ],
+    ]);
+    const resumes = new FakeResumesService({
+      hasResumeAnalyzed: true,
+      presentSkillIds: [skillMandatory],
+    });
+    const service = jobsService(repository, new FakeAdzunaAdapter(), resumes);
+
+    const response = await service.listJobs(USER_ID, {
+      onlyHighCompatibility: true,
+      limit: 2,
+    });
+
+    expect(response.items).toHaveLength(1);
+    expect(response.items[0]?.title).toBe('Seal Job');
+    expect(response.items[0]?.match?.isHighCompatibility).toBe(true);
+  });
+
+  it('returns an empty page for high-compatibility filter without resume analysis', async () => {
+    const repository = new FakeJobsRepository([
+      [jobRecord('job-1', 'Any Job')],
+    ]);
+    const service = jobsService(repository, new FakeAdzunaAdapter());
+
+    const response = await service.listJobs(USER_ID, {
+      onlyHighCompatibility: true,
+    });
+
+    expect(response.items).toHaveLength(0);
+    expect(response.meta.total).toBe(0);
   });
 });

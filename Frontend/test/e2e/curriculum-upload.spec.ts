@@ -6,6 +6,7 @@ async function loginWithCompleteProfile(page: import('@playwright/test').Page) {
   await page.goto('/login');
   await page.getByTestId('google-login-button').click();
   await expect(page).toHaveURL(/\/dashboard$/);
+  await expect(page.getByTestId('app-shell')).toBeVisible();
 }
 
 async function openCurriculumUpload(page: import('@playwright/test').Page) {
@@ -37,7 +38,9 @@ test.describe('curriculum upload', () => {
     });
   });
 
-  test('rejects files over 5MB without calling upload-url', async ({ page }) => {
+  test('rejects files over 5MB without calling upload-url', async ({
+    page,
+  }) => {
     let uploadUrlCalls = 0;
     await page.route('**/api/v1/resumes/upload-url', async (route) => {
       uploadUrlCalls += 1;

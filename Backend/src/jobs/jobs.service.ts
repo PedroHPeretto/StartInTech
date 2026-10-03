@@ -1,197 +1,182 @@
+import { BadGatewayException, Inject, Injectable } from '@nestjs/common';
 import {
-  EmploymentType,
-  SeniorityLevel,
-  WorkplaceType,
-  type JobOpportunityDto,
-  type JobQueryDto,
-  type JobSearchResponseDto,
+  JobSortBy,
+  type GetJobsQueryDto,
+  type JobListingDto,
+  type PaginatedJobsResponseDto,
 } from '@startintech/shared';
-import { BadGatewayException, Injectable } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
 import * as Sentry from '@sentry/nestjs';
 import { ProfilesService } from '../profiles/profiles.service.js';
+import { ResumesService } from '../resumes/resumes.service.js';
+import { AdzunaJobAdapter } from './adzuna-job.adapter.js';
+import { JobMatchingService } from './job-matching.service.js';
+import {
+  JOBS_REPOSITORY,
+  type JobListingRecord,
+  type JobsRepository,
+  type ListJobsFilterParams,
+} from './jobs.repository.js';
 
-const ADZUNA_SEARCH_URL = 'https://api.adzuna.com/v1/api/jobs/br/search';
-const RESULTS_PER_PAGE = 20;
+const DEFAULT_PAGE = 1;
+const DEFAULT_LIMIT = 10;
+const MAX_LIMIT = 50;
 
-const CAREER_SEARCH_KEYWORDS: Record<string, string> = {
-  'software-development': 'desenvolvedor de software',
-  'data-analysis': 'analista de dados',
-  'data-science': 'cientista de dados',
-  'ui-ux-design': 'designer ui ux',
-  'devops': 'engenheiro devops',
-  'product-management': 'product manager',
-  'quality-assurance': 'analista de qualidade',
-  'cybersecurity': 'analista de segurança',
-};
-
-export type FetchFn = typeof fetch;
-
-interface AdzunaJobResult {
-  id: string;
-  title: string;
-  description: string;
-  created: string;
-  redirect_url: string;
-  salary_min?: number;
-  salary_max?: number;
-  contract_time?: string;
-  contract_type?: string;
-  company?: { display_name?: string };
-  location?: { display_name?: string };
-}
-
-interface AdzunaSearchResponse {
-  results?: AdzunaJobResult[];
+interface EnrichedJobListing extends JobListingDto {
+  sortCreatedAt: Date;
 }
 
 @Injectable()
 export class JobsService {
-  fetchImpl: FetchFn;
-
   constructor(
-    private readonly config: ConfigService,
     private readonly profiles: ProfilesService,
-  ) {
-    this.fetchImpl = fetch.bind(globalThis);
-  }
+    private readonly resumes: ResumesService,
+    private readonly matching: JobMatchingService,
+    private readonly adzuna: AdzunaJobAdapter,
+    @Inject(JOBS_REPOSITORY)
+    private readonly jobs: JobsRepository,
+  ) {}
 
-  async search(
+  async listJobs(
     userId: string,
-    query: JobQueryDto,
-  ): Promise<JobSearchResponseDto> {
+    query: GetJobsQueryDto,
+  ): Promise<PaginatedJobsResponseDto> {
     const profile = await this.profiles.getByUserId(userId);
-    const keyword = this.resolveKeyword(profile, query.technology);
-    const jobs = await this.fetchFromAdzuna(keyword, query.location);
-    const mapped = jobs.map((job) => mapAdzunaJob(job));
-    const filtered = query.workplaceType
-      ? mapped.filter((job) => job.workplaceType === query.workplaceType)
-      : mapped;
-    return { jobs: filtered };
-  }
+    const page = query.page ?? DEFAULT_PAGE;
+    const limit = Math.min(query.limit ?? DEFAULT_LIMIT, MAX_LIMIT);
+    const filter: ListJobsFilterParams = {
+      careerTrackId: profile.careerTrack.id,
+      workplaceType: query.workplaceType,
+      search: query.search,
+    };
 
-  private resolveKeyword(
-    profile: Awaited<ReturnType<ProfilesService['getByUserId']>>,
-    technology?: string,
-  ): string {
-    if (technology?.trim()) {
-      return technology.trim();
-    }
-    const base =
-      CAREER_SEARCH_KEYWORDS[profile.careerTrack.slug] ??
-      profile.careerTrack.name.toLowerCase();
-    const seniorityWord =
-      profile.seniorityLevel === SeniorityLevel.INTERNSHIP
-        ? 'estágio'
-        : 'junior';
-    return `${base} ${seniorityWord}`;
-  }
+    let listings = await this.jobs.findAllForListing(filter);
+    const requiredRows = page * limit;
+    const isFullyCovered = listings.length >= requiredRows;
 
-  private async fetchFromAdzuna(
-    what: string,
-    where?: string,
-  ): Promise<AdzunaJobResult[]> {
-    const appId =
-      this.config.get<string>('ADZUNA_APP_ID') ?? process.env.ADZUNA_APP_ID;
-    const appKey =
-      this.config.get<string>('ADZUNA_APP_KEY') ?? process.env.ADZUNA_APP_KEY;
-    if (!appId?.trim() || !appKey?.trim()) {
-      this.reportAndThrowGateway(new Error('Adzuna credentials are not configured'));
+    if (!isFullyCovered) {
+      try {
+        const adzunaListings = await this.adzuna.searchJobs({
+          careerTrackName: profile.careerTrack.name,
+          careerTrackSlug: profile.careerTrack.slug,
+          page: 1,
+        });
+        await this.jobs.upsertMany(profile.careerTrack.id, adzunaListings);
+        listings = await this.jobs.findAllForListing(filter);
+      } catch (error) {
+        Sentry.captureException(error);
+        const cachedCount = await this.jobs.countActiveByCareerTrack(
+          profile.careerTrack.id,
+        );
+        if (cachedCount === 0) {
+          throw new BadGatewayException('Jobs provider unavailable');
+        }
+      }
     }
 
-    const params = new URLSearchParams({
-      app_id: appId,
-      app_key: appKey,
-      what,
-      results_per_page: String(RESULTS_PER_PAGE),
-      'content-type': 'application/json',
-    });
-    if (where?.trim()) {
-      params.set('where', where.trim());
-    }
+    const { hasResumeAnalyzed, presentSkillIds } =
+      await this.resumes.findLatestPresentSkills(userId);
+    const presentSkillIdSet = new Set(presentSkillIds);
 
-    const url = `${ADZUNA_SEARCH_URL}/1?${params.toString()}`;
-    let response: Response;
-    try {
-      response = await this.fetchImpl(url);
-    } catch (error) {
-      this.reportAndThrowGateway(error);
-    }
+    let enriched = listings.map((listing) =>
+      this.enrichListing(listing, hasResumeAnalyzed, presentSkillIdSet),
+    );
 
-    if (!response.ok) {
-      this.reportAndThrowGateway(
-        new Error(`Adzuna search failed with status ${response.status}`),
+    if (query.onlyHighCompatibility) {
+      enriched = enriched.filter(
+        (listing) => listing.match?.isHighCompatibility === true,
       );
     }
 
-    let body: AdzunaSearchResponse;
-    try {
-      body = (await response.json()) as AdzunaSearchResponse;
-    } catch (error) {
-      this.reportAndThrowGateway(error);
+    enriched = this.sortListings(enriched, query.sortBy);
+    const total = enriched.length;
+    const start = (page - 1) * limit;
+    const pageItems = enriched
+      .slice(start, start + limit)
+      .map(({ sortCreatedAt: _sortCreatedAt, ...listing }) => listing);
+
+    return this.toPaginatedResponse(pageItems, total, page, limit);
+  }
+
+  private enrichListing(
+    listing: JobListingRecord,
+    hasResumeAnalyzed: boolean,
+    presentSkillIds: ReadonlySet<string>,
+  ): EnrichedJobListing {
+    const requirements = listing.requirements.map((requirement) => ({
+      id: requirement.id,
+      name: requirement.name,
+      isMandatory: requirement.isMandatory,
+    }));
+
+    return {
+      id: listing.id,
+      title: listing.title,
+      company: listing.company,
+      location: listing.location,
+      workplaceType: listing.workplaceType,
+      description: listing.description,
+      applicationUrl: listing.applicationUrl,
+      careerTrack: listing.careerTrack,
+      requirements,
+      match: hasResumeAnalyzed
+        ? this.matching.calculateMatch(listing.requirements, presentSkillIds)
+        : null,
+      sortCreatedAt: listing.createdAt,
+    };
+  }
+
+  private sortListings(
+    listings: EnrichedJobListing[],
+    sortBy?: JobSortBy,
+  ): EnrichedJobListing[] {
+    const sorted = [...listings];
+
+    if (sortBy === JobSortBy.NEWEST) {
+      sorted.sort((left, right) => {
+        const byDate =
+          right.sortCreatedAt.getTime() - left.sortCreatedAt.getTime();
+        if (byDate !== 0) {
+          return byDate;
+        }
+        return left.title.localeCompare(right.title, 'pt-BR');
+      });
+      return sorted;
     }
 
-    return body.results ?? [];
+    if (sortBy === JobSortBy.MATCH_SCORE) {
+      sorted.sort((left, right) => {
+        const leftScore = left.match?.score ?? -1;
+        const rightScore = right.match?.score ?? -1;
+        if (rightScore !== leftScore) {
+          return rightScore - leftScore;
+        }
+        return left.title.localeCompare(right.title, 'pt-BR');
+      });
+      return sorted;
+    }
+
+    sorted.sort((left, right) =>
+      left.title.localeCompare(right.title, 'pt-BR'),
+    );
+    return sorted;
   }
 
-  private reportAndThrowGateway(error: unknown): never {
-    Sentry.captureException(error);
-    throw new BadGatewayException('Job search provider unavailable');
+  private toPaginatedResponse(
+    items: JobListingDto[],
+    total: number,
+    page: number,
+    limit: number,
+  ): PaginatedJobsResponseDto {
+    const totalPages = total === 0 ? 0 : Math.ceil(total / limit);
+    return {
+      items,
+      meta: {
+        total,
+        page,
+        limit,
+        totalPages,
+        hasNextPage: totalPages > 0 && page < totalPages,
+      },
+    };
   }
-}
-
-export function mapAdzunaJob(job: AdzunaJobResult): JobOpportunityDto {
-  const text = `${job.title} ${job.description} ${job.location?.display_name ?? ''}`;
-  return {
-    id: String(job.id),
-    title: job.title,
-    company: job.company?.display_name ?? 'Empresa não informada',
-    location: job.location?.display_name ?? 'Brasil',
-    workplaceType: inferWorkplaceType(text),
-    employmentType: inferEmploymentType(job, text),
-    salaryMin: job.salary_min,
-    salaryMax: job.salary_max,
-    description: job.description,
-    applyUrl: job.redirect_url,
-    postedAt: job.created,
-  };
-}
-
-export function inferWorkplaceType(text: string): WorkplaceType {
-  const normalized = text.toLowerCase();
-  if (
-    /\b(remot[oa]|remote|home office|trabalho remoto)\b/.test(normalized)
-  ) {
-    return WorkplaceType.REMOTE;
-  }
-  if (/\b(h[ií]brido|hybrid)\b/.test(normalized)) {
-    return WorkplaceType.HYBRID;
-  }
-  return WorkplaceType.ON_SITE;
-}
-
-export function inferEmploymentType(
-  job: AdzunaJobResult,
-  text: string,
-): EmploymentType {
-  const normalized = text.toLowerCase();
-  if (
-    /\b(est[aá]gio|internship|trainee)\b/.test(normalized) ||
-    job.contract_type?.toLowerCase() === 'internship'
-  ) {
-    return EmploymentType.INTERNSHIP;
-  }
-  if (
-    job.contract_time === 'part_time' ||
-    /\b(meio período|part[- ]time)\b/.test(normalized)
-  ) {
-    return EmploymentType.PART_TIME;
-  }
-  if (
-    job.contract_type === 'contract' ||
-    /\b(pj|contrato|freelance)\b/.test(normalized)
-  ) {
-    return EmploymentType.CONTRACT;
-  }
-  return EmploymentType.FULL_TIME;
 }

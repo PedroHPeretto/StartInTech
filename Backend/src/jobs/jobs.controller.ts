@@ -1,10 +1,7 @@
 import { Controller, Get, Query, Req, UseGuards } from '@nestjs/common';
-import {
-  WorkplaceType,
-  type JobQueryDto,
-  type JobSearchResponseDto,
-} from '@startintech/shared';
+import type { PaginatedJobsResponseDto } from '@startintech/shared';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard.js';
+import { GetJobsQueryDto } from './dto/get-jobs-query.dto.js';
 import { JobsService } from './jobs.service.js';
 
 interface AuthenticatedRequest {
@@ -20,29 +17,10 @@ export class JobsController {
 
   @Get()
   @UseGuards(JwtAuthGuard)
-  search(
+  listJobs(
     @Req() request: AuthenticatedRequest,
-    @Query('technology') technology?: string,
-    @Query('location') location?: string,
-    @Query('workplaceType') workplaceType?: string,
-  ): Promise<JobSearchResponseDto> {
-    const query: JobQueryDto = {
-      technology,
-      location,
-      workplaceType: parseWorkplaceType(workplaceType),
-    };
-    return this.jobsService.search(request.user.userId, query);
+    @Query() query: GetJobsQueryDto,
+  ): Promise<PaginatedJobsResponseDto> {
+    return this.jobsService.listJobs(request.user.userId, query);
   }
-}
-
-function parseWorkplaceType(
-  value?: string,
-): WorkplaceType | undefined {
-  if (!value) {
-    return undefined;
-  }
-  if (Object.values(WorkplaceType).includes(value as WorkplaceType)) {
-    return value as WorkplaceType;
-  }
-  return undefined;
 }
