@@ -210,6 +210,38 @@ describe('JobsService', () => {
     expect(response.items[0]?.title).toBe('Frontend Dev');
   });
 
+  it('respects refresh cooldown and does not repeatedly call Adzuna on subsequent requests', async () => {
+    const repository = new FakeJobsRepository(
+      [
+        [jobRecord('job-1', 'Initial')],
+        [jobRecord('job-1', 'Initial'), jobRecord('job-2', 'Refreshed')],
+        [jobRecord('job-1', 'Initial'), jobRecord('job-2', 'Refreshed')],
+      ],
+      2,
+    );
+    const adzuna = new FakeAdzunaAdapter();
+    adzuna.listings = [
+      {
+        title: 'Refreshed',
+        company: 'Beta',
+        location: 'Remoto',
+        workplaceType: WorkplaceType.REMOTE,
+        description: 'React',
+        applicationUrl: 'https://example.com/job-2',
+      },
+    ];
+
+    const service = jobsService(repository, adzuna);
+
+    // Request 1: cache miss triggers Adzuna
+    await service.listJobs(USER_ID, { page: 1, limit: 10 });
+    expect(adzuna.searchCalls).toBe(1);
+
+    // Request 2: page still not fully covered (2 < 10), but cooldown active -> no Adzuna call
+    await service.listJobs(USER_ID, { page: 1, limit: 10 });
+    expect(adzuna.searchCalls).toBe(1);
+  });
+
   it('returns stale cache and reports to Sentry when Adzuna fails but rows exist', async () => {
     const repository = new FakeJobsRepository(
       [[jobRecord('job-1', 'Cached role')]],

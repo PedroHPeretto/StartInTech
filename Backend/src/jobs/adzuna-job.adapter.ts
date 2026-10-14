@@ -1,7 +1,10 @@
 import { WorkplaceType } from '@startintech/shared';
 import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { buildAdzunaSearchWhat } from '../career-tracks/career-track-job-search.js';
+import {
+  buildAdzunaSearchWhat,
+  resolveAdzunaSearchParams,
+} from '../career-tracks/career-track-job-search.js';
 
 const ADZUNA_BASE_URL = 'https://api.adzuna.com';
 const REQUEST_TIMEOUT_MS = 15_000;
@@ -85,15 +88,17 @@ export class AdzunaJobAdapter {
     }
 
     const page = context.page ?? 1;
-    const what = this.buildSearchWhat(
-      context.careerTrackName,
-      context.careerTrackSlug,
-    );
+    const searchTerms = resolveAdzunaSearchParams(context.careerTrackSlug);
     const url = new URL(`${ADZUNA_BASE_URL}/v1/api/jobs/br/search/${page}`);
     url.searchParams.set('app_id', appId);
     url.searchParams.set('app_key', appKey);
-    url.searchParams.set('what', what);
+    url.searchParams.set('what', searchTerms.what);
+    if (searchTerms.whatOr) {
+      url.searchParams.set('what_or', searchTerms.whatOr);
+    }
     url.searchParams.set('results_per_page', String(ADZUNA_RESULTS_PER_PAGE));
+    url.searchParams.set('sort_by', 'date');
+    url.searchParams.set('max_days_old', '30');
 
     const response = await this.fetchImpl(url.toString(), {
       method: 'GET',

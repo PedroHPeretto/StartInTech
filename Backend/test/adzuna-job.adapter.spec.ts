@@ -84,9 +84,12 @@ describe('AdzunaJobAdapter', () => {
     expect(url).toContain('app_id=test-app-id');
     expect(url).toContain('app_key=test-app-key');
     const parsedUrl = new URL(url);
-    expect(parsedUrl.searchParams.get('what')).toBe(
-      'Desenvolvimento de Software desenvolvedor junior estágio',
+    expect(parsedUrl.searchParams.get('what')).toBe('desenvolvedor');
+    expect(parsedUrl.searchParams.get('what_or')).toBe(
+      'junior júnior estágio estagio estagiário trainee',
     );
+    expect(parsedUrl.searchParams.get('sort_by')).toBe('date');
+    expect(parsedUrl.searchParams.get('max_days_old')).toBe('30');
 
     expect(listings).toEqual([
       {

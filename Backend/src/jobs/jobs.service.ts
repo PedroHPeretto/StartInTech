@@ -20,6 +20,7 @@ import {
 const DEFAULT_PAGE = 1;
 const DEFAULT_LIMIT = 10;
 const MAX_LIMIT = 50;
+const TRACK_REFRESH_COOLDOWN_MS = 30 * 60 * 1000;
 
 interface EnrichedJobListing extends JobListingDto {
   sortCreatedAt: Date;
@@ -27,6 +28,8 @@ interface EnrichedJobListing extends JobListingDto {
 
 @Injectable()
 export class JobsService {
+  private readonly trackLastRefreshedAt = new Map<string, number>();
+
   constructor(
     private readonly profiles: ProfilesService,
     private readonly resumes: ResumesService,
@@ -35,6 +38,20 @@ export class JobsService {
     @Inject(JOBS_REPOSITORY)
     private readonly jobs: JobsRepository,
   ) {}
+
+  private shouldRefreshTrack(
+    careerTrackId: string,
+    isFullyCovered: boolean,
+  ): boolean {
+    if (isFullyCovered) {
+      return false;
+    }
+    const lastRefreshed = this.trackLastRefreshedAt.get(careerTrackId);
+    if (!lastRefreshed) {
+      return true;
+    }
+    return Date.now() - lastRefreshed > TRACK_REFRESH_COOLDOWN_MS;
+  }
 
   async listJobs(
     userId: string,
@@ -53,13 +70,14 @@ export class JobsService {
     const requiredRows = page * limit;
     const isFullyCovered = listings.length >= requiredRows;
 
-    if (!isFullyCovered) {
+    if (this.shouldRefreshTrack(profile.careerTrack.id, isFullyCovered)) {
       try {
         const adzunaListings = await this.adzuna.searchJobs({
           careerTrackName: profile.careerTrack.name,
           careerTrackSlug: profile.careerTrack.slug,
           page: 1,
         });
+        this.trackLastRefreshedAt.set(profile.careerTrack.id, Date.now());
         await this.jobs.upsertMany(profile.careerTrack.id, adzunaListings);
         listings = await this.jobs.findAllForListing(filter);
       } catch (error) {
