@@ -12,6 +12,8 @@ O **StartInTech Client** é a aplicação Web (SPA - Single Page Application) da
 ### Principais Objetivos:
 
 - Prover uma interface moderna, rápida e acessível em conformidade com as diretrizes de WCAG e do manual de identidade visual da marca (`docs/Manual_de_Identidade_Visual.pdf`).
+- Apresentar uma **Landing Page de conversão** atraente na rota raiz (`/`), destacando a proposta de valor, dores comuns, diagnóstico ATS, trilhas de carreira e FAQ, com CTA direto para entrada na plataforma.
+- Proteger rotas privadas (`/dashboard`, `/onboarding`, `/roadmap`, `/jobs`, `/curriculum/*`), mantendo apenas a Landing Page (`/`) e a página de login (`/login`) acessíveis publicamente.
 - Consumir a API REST do backend (`StartInTech API`) e integrar contratos de dados e DTOs fortemente tipados via `@startintech/shared`.
 - Monitorar erros de renderização e performance em tempo real no ambiente do navegador através do Sentry.
 - Desenvolver e documentar componentes isolados utilizando Storybook e validar fluxos críticos de ponta a ponta com Playwright.
