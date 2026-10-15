@@ -13,6 +13,7 @@ import { LoginPage } from '@/pages/login-page';
 import { OnboardingPage } from '@/pages/onboarding-page';
 import { JobsPage } from '@/pages/jobs-page';
 import { RoadmapPage } from '@/pages/roadmap-page';
+import { LandingPage } from '@/pages/landing-page';
 import type { RouterContext } from '@/routes/router-context';
 import { getPostAuthRoute } from '@/auth/redirect-after-auth';
 
@@ -23,13 +24,7 @@ const rootRoute = createRootRouteWithContext<RouterContext>()({
 const indexRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: '/',
-  beforeLoad: ({ context }) => {
-    const { auth } = context;
-    if (!auth.isAuthenticated) {
-      throw redirect({ to: '/login' });
-    }
-    throw redirect({ to: getPostAuthRoute(auth.isProfileComplete) });
-  },
+  component: LandingPage,
 });
 
 const authenticatedLayoutRoute = createRoute({

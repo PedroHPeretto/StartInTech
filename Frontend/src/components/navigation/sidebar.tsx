@@ -65,7 +65,7 @@ export function Sidebar({
       {/* Top Section */}
       <div className="flex flex-col gap-8">
         <div className="flex items-center justify-between">
-          <BrandHeader theme="dark" showTagline={false} />
+          <BrandHeader href="/dashboard" theme="dark" showTagline={false} />
           {/* Mobile close button */}
           {onClose && (
             <button
