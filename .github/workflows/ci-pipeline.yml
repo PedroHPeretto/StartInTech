@@ -125,7 +125,7 @@ jobs:
         run: bun run build:shared
 
       - name: Install Playwright Chromium & OS Dependencies
-        run: bunx playwright install --with-deps chromium
+        run: bun --cwd Frontend playwright install --with-deps chromium
 
       - name: Run Vitest Suite (Backend & Frontend)
         run: bun run test
@@ -149,7 +149,7 @@ jobs:
         run: bun run build:shared
 
       - name: Install Playwright Chromium & OS Dependencies
-        run: bunx playwright install --with-deps chromium
+        run: bun --cwd Frontend playwright install --with-deps chromium
 
       - name: Run Playwright E2E Tests
         run: bun --cwd Frontend test:e2e

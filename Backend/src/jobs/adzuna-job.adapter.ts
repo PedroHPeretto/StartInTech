@@ -88,7 +88,10 @@ export class AdzunaJobAdapter {
     }
 
     const page = context.page ?? 1;
-    const searchTerms = resolveAdzunaSearchParams(context.careerTrackSlug);
+    const searchTerms = resolveAdzunaSearchParams(
+      context.careerTrackSlug,
+      context.careerTrackName,
+    );
     const url = new URL(`${ADZUNA_BASE_URL}/v1/api/jobs/br/search/${page}`);
     url.searchParams.set('app_id', appId);
     url.searchParams.set('app_key', appKey);

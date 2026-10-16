@@ -48,13 +48,24 @@ export const DEFAULT_ADZUNA_SEARCH_TERMS: AdzunaSearchParams = {
   whatOr: 'junior júnior estágio estagio estagiário trainee',
 };
 
-export function resolveAdzunaSearchParams(slug: string): AdzunaSearchParams {
-  return ADZUNA_SEARCH_TERMS_BY_SLUG[slug] ?? DEFAULT_ADZUNA_SEARCH_TERMS;
+export function resolveAdzunaSearchParams(
+  slug: string,
+  fallbackName?: string,
+): AdzunaSearchParams {
+  const mapped = ADZUNA_SEARCH_TERMS_BY_SLUG[slug];
+  if (mapped) {
+    return mapped;
+  }
+  const what = fallbackName?.trim() || DEFAULT_ADZUNA_SEARCH_TERMS.what;
+  return {
+    what,
+    whatOr: DEFAULT_ADZUNA_SEARCH_TERMS.whatOr,
+  };
 }
 
 export function buildAdzunaSearchWhat(
-  _careerTrackName: string,
+  careerTrackName: string,
   slug: string,
 ): string {
-  return resolveAdzunaSearchParams(slug).what;
+  return resolveAdzunaSearchParams(slug, careerTrackName).what;
 }

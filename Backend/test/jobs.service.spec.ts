@@ -67,6 +67,7 @@ class FakeJobsRepository implements JobsRepository {
   findAllCalls = 0;
   upsertCalls = 0;
   lastUpsertListings: AdzunaJobListingInput[] = [];
+  upsertError: Error | null = null;
 
   constructor(
     private readonly sequences: JobListingRecord[][],
@@ -91,17 +92,24 @@ class FakeJobsRepository implements JobsRepository {
   ): Promise<void> {
     this.upsertCalls += 1;
     this.lastUpsertListings = listings;
+    if (this.upsertError) {
+      return Promise.reject(this.upsertError);
+    }
     return Promise.resolve();
   }
 }
 
 class FakeAdzunaAdapter {
   searchCalls = 0;
+  searchDelayMs = 0;
   listings: AdzunaJobListingInput[] = [];
   error: Error | null = null;
 
-  searchJobs(): Promise<AdzunaJobListingInput[]> {
+  async searchJobs(): Promise<AdzunaJobListingInput[]> {
     this.searchCalls += 1;
+    if (this.searchDelayMs > 0) {
+      await new Promise((resolve) => setTimeout(resolve, this.searchDelayMs));
+    }
     if (this.error) {
       return Promise.reject(this.error);
     }
@@ -240,6 +248,73 @@ describe('JobsService', () => {
     // Request 2: page still not fully covered (2 < 10), but cooldown active -> no Adzuna call
     await service.listJobs(USER_ID, { page: 1, limit: 10 });
     expect(adzuna.searchCalls).toBe(1);
+  });
+
+  it('de-duplicates concurrent refreshes for the same career track', async () => {
+    const repository = new FakeJobsRepository(
+      [
+        [jobRecord('job-1', 'Initial')],
+        [jobRecord('job-1', 'Initial')],
+        [jobRecord('job-1', 'Initial'), jobRecord('job-2', 'Refreshed')],
+        [jobRecord('job-1', 'Initial'), jobRecord('job-2', 'Refreshed')],
+      ],
+      2,
+    );
+    const adzuna = new FakeAdzunaAdapter();
+    adzuna.searchDelayMs = 20;
+    adzuna.listings = [
+      {
+        title: 'Refreshed',
+        company: 'Beta',
+        location: 'Remoto',
+        workplaceType: WorkplaceType.REMOTE,
+        description: 'React',
+        applicationUrl: 'https://example.com/job-2',
+      },
+    ];
+
+    const service = jobsService(repository, adzuna);
+
+    const [res1, res2] = await Promise.all([
+      service.listJobs(USER_ID, { page: 1, limit: 10 }),
+      service.listJobs(USER_ID, { page: 1, limit: 10 }),
+    ]);
+
+    expect(adzuna.searchCalls).toBe(1);
+    expect(repository.upsertCalls).toBe(1);
+    expect(res1.items).toHaveLength(2);
+    expect(res2.items).toHaveLength(2);
+  });
+
+  it('does not set cooldown if upsertMany fails so future requests can retry', async () => {
+    const repository = new FakeJobsRepository(
+      [[jobRecord('job-1', 'Initial')], [jobRecord('job-1', 'Initial')]],
+      1,
+    );
+    repository.upsertError = new Error('Database write error');
+    const adzuna = new FakeAdzunaAdapter();
+    adzuna.listings = [
+      {
+        title: 'Refreshed',
+        company: 'Beta',
+        location: 'Remoto',
+        workplaceType: WorkplaceType.REMOTE,
+        description: 'React',
+        applicationUrl: 'https://example.com/job-2',
+      },
+    ];
+
+    const service = jobsService(repository, adzuna);
+
+    // Call 1: upsert fails, but cached count > 0 so returns stale cache without throwing
+    await service.listJobs(USER_ID, { page: 1, limit: 10 });
+    expect(adzuna.searchCalls).toBe(1);
+    expect(repository.upsertCalls).toBe(1);
+
+    // Call 2: since cooldown was not set, it should attempt to refresh again
+    repository.upsertError = null;
+    await service.listJobs(USER_ID, { page: 1, limit: 10 });
+    expect(adzuna.searchCalls).toBe(2);
   });
 
   it('returns stale cache and reports to Sentry when Adzuna fails but rows exist', async () => {

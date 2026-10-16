@@ -103,6 +103,30 @@ describe('AdzunaJobAdapter', () => {
     ]);
   });
 
+  it('falls back to careerTrackName for unmapped track slugs', async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () => ({ results: [] }),
+    });
+
+    const adapter = new AdzunaJobAdapter(createConfig());
+    adapter.fetchImpl = fetchMock;
+
+    await adapter.searchJobs({
+      careerTrackName: 'Blockchain Specialist',
+      careerTrackSlug: 'blockchain-specialist',
+      page: 1,
+    });
+
+    const [url] = fetchMock.mock.calls[0] as [string];
+    const parsedUrl = new URL(url);
+    expect(parsedUrl.searchParams.get('what')).toBe('Blockchain Specialist');
+    expect(parsedUrl.searchParams.get('what_or')).toBe(
+      'junior júnior estágio estagio estagiário trainee',
+    );
+  });
+
   it('throws when Adzuna responds with an error status', async () => {
     const fetchMock = vi.fn().mockResolvedValue({
       ok: false,
