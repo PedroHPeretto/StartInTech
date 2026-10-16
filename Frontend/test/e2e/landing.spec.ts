@@ -77,15 +77,20 @@ test.describe('Landing Page (rota raiz /)', () => {
   test('permite interação com o Accordion de FAQ', async ({ page }) => {
     await page.goto('/');
 
-    const questionButton = page.getByRole('button', {
-      name: /A StartInTech é realmente gratuita/i,
-    });
-    await expect(questionButton).toBeVisible();
-
-    // Clica para expandir/verificar
-    await questionButton.click();
+    // O primeiro item vem aberto por padrão (defaultValue=['item-1'])
     await expect(
       page.getByText(/O diagnóstico de currículo via ATS, o roadmap/i),
+    ).toBeVisible();
+
+    // Clica no segundo item para expandi-lo
+    const secondQuestionButton = page.getByRole('button', {
+      name: /Preciso ter experiência prévia para usar a plataforma/i,
+    });
+    await expect(secondQuestionButton).toBeVisible();
+    await secondQuestionButton.click();
+
+    await expect(
+      page.getByText(/Não\. A StartInTech foi criada especialmente/i),
     ).toBeVisible();
   });
 
