@@ -1,4 +1,11 @@
-import { Column, Entity, JoinColumn, ManyToOne, PrimaryColumn } from 'typeorm';
+import {
+  Column,
+  Entity,
+  JoinColumn,
+  ManyToOne,
+  PrimaryColumn,
+  type Relation,
+} from 'typeorm';
 import { Skill } from '../resumes/skill.entity.js';
 import { JobOpportunity } from './job-opportunity.entity.js';
 
@@ -14,11 +21,11 @@ export class JobSkill {
     onDelete: 'CASCADE',
   })
   @JoinColumn({ name: 'job_id' })
-  job!: JobOpportunity;
+  job!: Relation<JobOpportunity>;
 
   @ManyToOne(() => Skill, { nullable: false })
   @JoinColumn({ name: 'skill_id' })
-  skill!: Skill;
+  skill!: Relation<Skill>;
 
   @Column({ name: 'is_mandatory', type: 'boolean' })
   isMandatory!: boolean;

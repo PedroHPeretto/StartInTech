@@ -7,8 +7,9 @@ import {
   ManyToOne,
   OneToMany,
   PrimaryGeneratedColumn,
+  type Relation,
 } from 'typeorm';
-import { JobSkill } from './job-skill.entity.js';
+import type { JobSkill } from './job-skill.entity.js';
 import { CareerTrack } from '../career-tracks/career-track.entity.js';
 
 @Entity('job_opportunities')
@@ -49,6 +50,6 @@ export class JobOpportunity {
   @CreateDateColumn({ name: 'created_at', type: 'timestamptz' })
   createdAt!: Date;
 
-  @OneToMany(() => JobSkill, (jobSkill) => jobSkill.job)
-  jobSkills!: JobSkill[];
+  @OneToMany('JobSkill', (jobSkill: JobSkill) => jobSkill.job)
+  jobSkills!: Relation<JobSkill[]>;
 }

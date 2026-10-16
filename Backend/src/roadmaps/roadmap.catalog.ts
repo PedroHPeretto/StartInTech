@@ -1,4 +1,4 @@
-import { SkillPriority } from '@startintech/shared';
+import { SkillCategory, SkillPriority } from '@startintech/shared';
 import { CAREER_TRACK_CATALOG } from '../career-tracks/career-track.catalog.js';
 
 export interface RoadmapSeed {
@@ -16,7 +16,75 @@ export interface RoadmapNodeSeed {
   description: string | null;
   priority: SkillPriority;
   sequenceOrder: number;
+  skillName?: string | null;
 }
+
+export interface CanonicalSkillDefinition {
+  name: string;
+  category: SkillCategory;
+}
+
+export const CANONICAL_SKILL_DEFINITIONS: readonly CanonicalSkillDefinition[] =
+  [
+    { name: 'Lógica de Programação', category: SkillCategory.SOFT_SKILL },
+    { name: 'Estrutura de Dados', category: SkillCategory.TOOL },
+    { name: 'Git', category: SkillCategory.TOOL },
+    { name: 'Code Review', category: SkillCategory.SOFT_SKILL },
+    { name: 'HTML/CSS', category: SkillCategory.LANGUAGE },
+    { name: 'JavaScript', category: SkillCategory.LANGUAGE },
+    { name: 'APIs REST', category: SkillCategory.TOOL },
+    { name: 'Testes Automatizados', category: SkillCategory.TOOL },
+    { name: 'CI/CD', category: SkillCategory.TOOL },
+    { name: 'Métricas de Negócio', category: SkillCategory.SOFT_SKILL },
+    { name: 'Excel', category: SkillCategory.TOOL },
+    { name: 'SQL', category: SkillCategory.DATABASE },
+    { name: 'Modelagem de Dados', category: SkillCategory.DATABASE },
+    { name: 'ETL', category: SkillCategory.TOOL },
+    { name: 'Power BI', category: SkillCategory.TOOL },
+    { name: 'Estatística', category: SkillCategory.TOOL },
+    { name: 'Probabilidade', category: SkillCategory.TOOL },
+    { name: 'Pandas', category: SkillCategory.FRAMEWORK },
+    { name: 'Python', category: SkillCategory.LANGUAGE },
+    { name: 'Machine Learning', category: SkillCategory.TOOL },
+    { name: 'Scikit-learn', category: SkillCategory.FRAMEWORK },
+    { name: 'UX Research', category: SkillCategory.TOOL },
+    { name: 'Mapeamento de Jornada', category: SkillCategory.TOOL },
+    { name: 'UI Design', category: SkillCategory.TOOL },
+    { name: 'Figma', category: SkillCategory.TOOL },
+    { name: 'Testes de Usabilidade', category: SkillCategory.TOOL },
+    { name: 'Design System', category: SkillCategory.TOOL },
+    { name: 'Linux', category: SkillCategory.TOOL },
+    { name: 'Redes de Computadores', category: SkillCategory.TOOL },
+    { name: 'Automação de Testes', category: SkillCategory.TOOL },
+    { name: 'Docker', category: SkillCategory.TOOL },
+    { name: 'Cloud Computing', category: SkillCategory.TOOL },
+    { name: 'Product Discovery', category: SkillCategory.SOFT_SKILL },
+    { name: 'Pesquisa com Usuários', category: SkillCategory.SOFT_SKILL },
+    { name: 'OKRs e Métricas', category: SkillCategory.SOFT_SKILL },
+    { name: 'Gestão de Backlog', category: SkillCategory.TOOL },
+    {
+      name: 'Metodologias Ágeis (Scrum/Kanban)',
+      category: SkillCategory.SOFT_SKILL,
+    },
+    { name: 'Casos de Teste', category: SkillCategory.TOOL },
+    { name: 'Testes Funcionais', category: SkillCategory.TOOL },
+    { name: 'Cypress', category: SkillCategory.TOOL },
+    { name: 'Selenium', category: SkillCategory.TOOL },
+    { name: 'Postman', category: SkillCategory.TOOL },
+    { name: 'Garantia de Qualidade (QA)', category: SkillCategory.TOOL },
+    { name: 'Segurança da Informação', category: SkillCategory.TOOL },
+    { name: 'Criptografia e Autenticação', category: SkillCategory.TOOL },
+    { name: 'OWASP', category: SkillCategory.TOOL },
+    {
+      name: 'Segurança em Aplicações Web (AppSec)',
+      category: SkillCategory.TOOL,
+    },
+    {
+      name: 'Monitoramento e Resposta a Incidentes',
+      category: SkillCategory.TOOL,
+    },
+    { name: 'LGPD e Compliance', category: SkillCategory.SOFT_SKILL },
+  ];
 
 interface CatalogNode {
   id: string;
@@ -25,6 +93,7 @@ interface CatalogNode {
   priority: SkillPriority;
   sequenceOrder: number;
   children: CatalogNode[];
+  skillName?: string | null;
 }
 
 interface RoadmapTree {
@@ -49,6 +118,7 @@ function topic(
   priority: SkillPriority,
   sequenceOrder: number,
   children: CatalogNode[] = [],
+  skillName?: string | null,
 ): CatalogNode {
   return {
     id: nodeUuid(sequence),
@@ -57,6 +127,7 @@ function topic(
     priority,
     sequenceOrder,
     children,
+    skillName: skillName ?? null,
   };
 }
 
@@ -79,6 +150,8 @@ const ROADMAP_TREES: Record<string, RoadmapTree> = {
             'Variáveis, condicionais, laços e funções em exercícios curtos.',
             SkillPriority.ESSENTIAL,
             1,
+            [],
+            'Lógica de Programação',
           ),
           topic(
             3,
@@ -86,6 +159,8 @@ const ROADMAP_TREES: Record<string, RoadmapTree> = {
             'Listas e dicionários, e quando cada estrutura simplifica o problema.',
             SkillPriority.ESSENTIAL,
             2,
+            [],
+            'Estrutura de Dados',
           ),
           topic(
             4,
@@ -100,8 +175,11 @@ const ROADMAP_TREES: Record<string, RoadmapTree> = {
                 'Leia um diff, peça feedback e aplique o que foi combinado.',
                 SkillPriority.RECOMMENDED,
                 1,
+                [],
+                'Code Review',
               ),
             ],
+            'Git',
           ),
         ],
       ),
@@ -118,6 +196,8 @@ const ROADMAP_TREES: Record<string, RoadmapTree> = {
             'Estrutura semântica, layout e contraste para qualquer pessoa usar.',
             SkillPriority.ESSENTIAL,
             1,
+            [],
+            'HTML/CSS',
           ),
           topic(
             8,
@@ -132,8 +212,11 @@ const ROADMAP_TREES: Record<string, RoadmapTree> = {
                 'Requisições, status codes e como ler uma resposta JSON.',
                 SkillPriority.RECOMMENDED,
                 1,
+                [],
+                'APIs REST',
               ),
             ],
+            'JavaScript',
           ),
         ],
       ),
@@ -150,6 +233,8 @@ const ROADMAP_TREES: Record<string, RoadmapTree> = {
             'Escreva um teste que falha quando o comportamento quebra.',
             SkillPriority.RECOMMENDED,
             1,
+            [],
+            'Testes Automatizados',
           ),
           topic(
             12,
@@ -157,6 +242,8 @@ const ROADMAP_TREES: Record<string, RoadmapTree> = {
             'Ambiente, variáveis e a publicação de uma versão acessível na web.',
             SkillPriority.ADVANCED,
             2,
+            [],
+            'CI/CD',
           ),
         ],
       ),
@@ -180,6 +267,8 @@ const ROADMAP_TREES: Record<string, RoadmapTree> = {
             'Transforme um pedido vago em uma métrica que dá para calcular.',
             SkillPriority.ESSENTIAL,
             1,
+            [],
+            'Métricas de Negócio',
           ),
           topic(
             15,
@@ -187,6 +276,8 @@ const ROADMAP_TREES: Record<string, RoadmapTree> = {
             'Filtros, tabelas dinâmicas e fórmulas para explorar um conjunto pequeno.',
             SkillPriority.ESSENTIAL,
             2,
+            [],
+            'Excel',
           ),
         ],
       ),
@@ -210,8 +301,11 @@ const ROADMAP_TREES: Record<string, RoadmapTree> = {
                 'JOIN, GROUP BY e HAVING para cruzar e resumir tabelas.',
                 SkillPriority.RECOMMENDED,
                 1,
+                [],
+                'Modelagem de Dados',
               ),
             ],
+            'SQL',
           ),
           topic(
             19,
@@ -219,6 +313,8 @@ const ROADMAP_TREES: Record<string, RoadmapTree> = {
             'Nulos, duplicatas e tipos inconsistentes antes de qualquer gráfico.',
             SkillPriority.RECOMMENDED,
             2,
+            [],
+            'ETL',
           ),
         ],
       ),
@@ -235,6 +331,8 @@ const ROADMAP_TREES: Record<string, RoadmapTree> = {
             'Escolha o gráfico certo e escreva um título que afirma a conclusão.',
             SkillPriority.RECOMMENDED,
             1,
+            [],
+            'Power BI',
           ),
         ],
       ),
@@ -259,6 +357,8 @@ const ROADMAP_TREES: Record<string, RoadmapTree> = {
             'Média, mediana, dispersão e quando cada resumo engana.',
             SkillPriority.ESSENTIAL,
             1,
+            [],
+            'Estatística',
           ),
           topic(
             24,
@@ -266,6 +366,8 @@ const ROADMAP_TREES: Record<string, RoadmapTree> = {
             'Incerteza, amostragem e o que um resultado isolado não prova.',
             SkillPriority.RECOMMENDED,
             2,
+            [],
+            'Probabilidade',
           ),
         ],
       ),
@@ -282,6 +384,8 @@ const ROADMAP_TREES: Record<string, RoadmapTree> = {
             'DataFrames, seleção e agregação do dia a dia.',
             SkillPriority.ESSENTIAL,
             1,
+            [],
+            'Pandas',
           ),
           topic(
             27,
@@ -289,6 +393,8 @@ const ROADMAP_TREES: Record<string, RoadmapTree> = {
             'Gráficos exploratórios para achar padrões e outliers.',
             SkillPriority.RECOMMENDED,
             2,
+            [],
+            'Python',
           ),
         ],
       ),
@@ -312,8 +418,11 @@ const ROADMAP_TREES: Record<string, RoadmapTree> = {
                 'Separe treino e teste e desconfie de um acerto alto demais.',
                 SkillPriority.ADVANCED,
                 1,
+                [],
+                'Scikit-learn',
               ),
             ],
+            'Machine Learning',
           ),
         ],
       ),
@@ -338,6 +447,8 @@ const ROADMAP_TREES: Record<string, RoadmapTree> = {
             'Conduza conversas e sintetize quem usa o produto e por quê.',
             SkillPriority.ESSENTIAL,
             1,
+            [],
+            'UX Research',
           ),
           topic(
             33,
@@ -345,6 +456,8 @@ const ROADMAP_TREES: Record<string, RoadmapTree> = {
             'Mapeie etapas, fricções e oportunidades ao longo do uso.',
             SkillPriority.RECOMMENDED,
             2,
+            [],
+            'Mapeamento de Jornada',
           ),
         ],
       ),
@@ -361,6 +474,8 @@ const ROADMAP_TREES: Record<string, RoadmapTree> = {
             'Hierarquia, espaçamento, tipografia e estados da interface.',
             SkillPriority.ESSENTIAL,
             1,
+            [],
+            'UI Design',
           ),
           topic(
             36,
@@ -375,8 +490,11 @@ const ROADMAP_TREES: Record<string, RoadmapTree> = {
                 'Observe alguém usando o protótipo e registre onde a pessoa trava.',
                 SkillPriority.RECOMMENDED,
                 1,
+                [],
+                'Testes de Usabilidade',
               ),
             ],
+            'Figma',
           ),
         ],
       ),
@@ -393,6 +511,8 @@ const ROADMAP_TREES: Record<string, RoadmapTree> = {
             'Cores, espaçamento e componentes que podem ser reutilizados.',
             SkillPriority.RECOMMENDED,
             1,
+            [],
+            'Design System',
           ),
         ],
       ),
@@ -416,6 +536,8 @@ const ROADMAP_TREES: Record<string, RoadmapTree> = {
             'Arquivos, processos e comandos para investigar um servidor.',
             SkillPriority.ESSENTIAL,
             1,
+            [],
+            'Linux',
           ),
           topic(
             42,
@@ -423,6 +545,8 @@ const ROADMAP_TREES: Record<string, RoadmapTree> = {
             'Portas, DNS e o caminho de uma requisição até a aplicação.',
             SkillPriority.RECOMMENDED,
             2,
+            [],
+            'Redes de Computadores',
           ),
         ],
       ),
@@ -446,8 +570,11 @@ const ROADMAP_TREES: Record<string, RoadmapTree> = {
                 'Decida o que roda a cada commit e o que pode esperar.',
                 SkillPriority.RECOMMENDED,
                 1,
+                [],
+                'Automação de Testes',
               ),
             ],
+            'CI/CD',
           ),
           topic(
             46,
@@ -455,6 +582,8 @@ const ROADMAP_TREES: Record<string, RoadmapTree> = {
             'Empacote a aplicação para ela rodar igual em qualquer máquina.',
             SkillPriority.RECOMMENDED,
             2,
+            [],
+            'Docker',
           ),
         ],
       ),
@@ -471,6 +600,8 @@ const ROADMAP_TREES: Record<string, RoadmapTree> = {
             'Ambientes, segredos e um rollback simples quando a versão falha.',
             SkillPriority.ADVANCED,
             1,
+            [],
+            'Cloud Computing',
           ),
         ],
       ),
@@ -494,6 +625,8 @@ const ROADMAP_TREES: Record<string, RoadmapTree> = {
             'Quem sofre, em que contexto e qual evidência sustenta isso.',
             SkillPriority.ESSENTIAL,
             1,
+            [],
+            'Product Discovery',
           ),
           topic(
             51,
@@ -501,6 +634,8 @@ const ROADMAP_TREES: Record<string, RoadmapTree> = {
             'Perguntas abertas e síntese sem vender a solução.',
             SkillPriority.RECOMMENDED,
             2,
+            [],
+            'Pesquisa com Usuários',
           ),
         ],
       ),
@@ -517,6 +652,8 @@ const ROADMAP_TREES: Record<string, RoadmapTree> = {
             'Um objetivo de produto e a métrica que mostra progresso.',
             SkillPriority.ESSENTIAL,
             1,
+            [],
+            'OKRs e Métricas',
           ),
           topic(
             54,
@@ -524,6 +661,8 @@ const ROADMAP_TREES: Record<string, RoadmapTree> = {
             'Histórias pequenas com um critério claro de pronto.',
             SkillPriority.ESSENTIAL,
             2,
+            [],
+            'Gestão de Backlog',
           ),
         ],
       ),
@@ -540,6 +679,8 @@ const ROADMAP_TREES: Record<string, RoadmapTree> = {
             'Planejamento, revisão e o registro de uma decisão.',
             SkillPriority.RECOMMENDED,
             1,
+            [],
+            'Metodologias Ágeis (Scrum/Kanban)',
           ),
         ],
       ),
@@ -564,6 +705,8 @@ const ROADMAP_TREES: Record<string, RoadmapTree> = {
             'Passos, resultado esperado e um relatório de bug reproduzível.',
             SkillPriority.ESSENTIAL,
             1,
+            [],
+            'Casos de Teste',
           ),
           topic(
             59,
@@ -571,6 +714,8 @@ const ROADMAP_TREES: Record<string, RoadmapTree> = {
             'Partição de equivalência e valores-limite sem ler o código.',
             SkillPriority.RECOMMENDED,
             2,
+            [],
+            'Testes Funcionais',
           ),
         ],
       ),
@@ -594,8 +739,11 @@ const ROADMAP_TREES: Record<string, RoadmapTree> = {
                 'Escolha âncoras que sobrevivem a um ajuste visual.',
                 SkillPriority.RECOMMENDED,
                 1,
+                [],
+                'Selenium',
               ),
             ],
+            'Cypress',
           ),
           topic(
             63,
@@ -603,6 +751,8 @@ const ROADMAP_TREES: Record<string, RoadmapTree> = {
             'Valide contrato, status e erros de um endpoint.',
             SkillPriority.RECOMMENDED,
             2,
+            [],
+            'Postman',
           ),
         ],
       ),
@@ -619,6 +769,8 @@ const ROADMAP_TREES: Record<string, RoadmapTree> = {
             'Distribua o esforço de teste conforme o risco do produto.',
             SkillPriority.ADVANCED,
             1,
+            [],
+            'Garantia de Qualidade (QA)',
           ),
         ],
       ),
@@ -643,6 +795,8 @@ const ROADMAP_TREES: Record<string, RoadmapTree> = {
             'O que proteger, de quem, e qual o impacto se a proteção falhar.',
             SkillPriority.ESSENTIAL,
             1,
+            [],
+            'Segurança da Informação',
           ),
           topic(
             68,
@@ -650,6 +804,8 @@ const ROADMAP_TREES: Record<string, RoadmapTree> = {
             'Sessão, senha e o que nunca deve ficar exposto no cliente.',
             SkillPriority.ESSENTIAL,
             2,
+            [],
+            'Criptografia e Autenticação',
           ),
         ],
       ),
@@ -673,8 +829,11 @@ const ROADMAP_TREES: Record<string, RoadmapTree> = {
                 'Como uma entrada não confiável vira comando ou script.',
                 SkillPriority.RECOMMENDED,
                 1,
+                [],
+                'Segurança em Aplicações Web (AppSec)',
               ),
             ],
+            'OWASP',
           ),
         ],
       ),
@@ -691,6 +850,8 @@ const ROADMAP_TREES: Record<string, RoadmapTree> = {
             'O que registrar e os primeiros passos quando algo sai do esperado.',
             SkillPriority.RECOMMENDED,
             1,
+            [],
+            'Monitoramento e Resposta a Incidentes',
           ),
           topic(
             74,
@@ -698,6 +859,8 @@ const ROADMAP_TREES: Record<string, RoadmapTree> = {
             'Por que regras de privacidade e de acesso existem no produto.',
             SkillPriority.ADVANCED,
             2,
+            [],
+            'LGPD e Compliance',
           ),
         ],
       ),
@@ -728,6 +891,7 @@ function flattenNodes(
       description: node.description,
       priority: node.priority,
       sequenceOrder: node.sequenceOrder,
+      skillName: node.skillName ?? null,
     });
     flattenNodes(roadmapId, node.children, node.id, acc);
   }

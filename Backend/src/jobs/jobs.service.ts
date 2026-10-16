@@ -20,6 +20,7 @@ import {
 const DEFAULT_PAGE = 1;
 const DEFAULT_LIMIT = 10;
 const MAX_LIMIT = 50;
+const TRACK_REFRESH_COOLDOWN_MS = 30 * 60 * 1000;
 
 interface EnrichedJobListing extends JobListingDto {
   sortCreatedAt: Date;
@@ -27,6 +28,9 @@ interface EnrichedJobListing extends JobListingDto {
 
 @Injectable()
 export class JobsService {
+  private readonly trackLastRefreshedAt = new Map<string, number>();
+  private readonly inFlightRefreshes = new Map<string, Promise<boolean>>();
+
   constructor(
     private readonly profiles: ProfilesService,
     private readonly resumes: ResumesService,
@@ -35,6 +39,58 @@ export class JobsService {
     @Inject(JOBS_REPOSITORY)
     private readonly jobs: JobsRepository,
   ) {}
+
+  private shouldRefreshTrack(
+    careerTrackId: string,
+    isFullyCovered: boolean,
+  ): boolean {
+    if (isFullyCovered) {
+      return false;
+    }
+    const lastRefreshed = this.trackLastRefreshedAt.get(careerTrackId);
+    if (!lastRefreshed) {
+      return true;
+    }
+    return Date.now() - lastRefreshed > TRACK_REFRESH_COOLDOWN_MS;
+  }
+
+  private async refreshTrackJobs(track: {
+    id: string;
+    name: string;
+    slug: string;
+  }): Promise<boolean> {
+    const existing = this.inFlightRefreshes.get(track.id);
+    if (existing) {
+      return existing;
+    }
+
+    const refreshPromise = (async () => {
+      try {
+        const adzunaListings = await this.adzuna.searchJobs({
+          careerTrackName: track.name,
+          careerTrackSlug: track.slug,
+          page: 1,
+        });
+        await this.jobs.upsertMany(track.id, adzunaListings);
+        this.trackLastRefreshedAt.set(track.id, Date.now());
+        return true;
+      } catch (error) {
+        Sentry.captureException(error);
+        const cachedCount = await this.jobs.countActiveByCareerTrack(track.id);
+        if (cachedCount === 0) {
+          throw new BadGatewayException('Jobs provider unavailable');
+        }
+        return false;
+      }
+    })();
+
+    this.inFlightRefreshes.set(track.id, refreshPromise);
+    try {
+      return await refreshPromise;
+    } finally {
+      this.inFlightRefreshes.delete(track.id);
+    }
+  }
 
   async listJobs(
     userId: string,
@@ -53,23 +109,10 @@ export class JobsService {
     const requiredRows = page * limit;
     const isFullyCovered = listings.length >= requiredRows;
 
-    if (!isFullyCovered) {
-      try {
-        const adzunaListings = await this.adzuna.searchJobs({
-          careerTrackName: profile.careerTrack.name,
-          careerTrackSlug: profile.careerTrack.slug,
-          page: 1,
-        });
-        await this.jobs.upsertMany(profile.careerTrack.id, adzunaListings);
+    if (this.shouldRefreshTrack(profile.careerTrack.id, isFullyCovered)) {
+      const refreshed = await this.refreshTrackJobs(profile.careerTrack);
+      if (refreshed) {
         listings = await this.jobs.findAllForListing(filter);
-      } catch (error) {
-        Sentry.captureException(error);
-        const cachedCount = await this.jobs.countActiveByCareerTrack(
-          profile.careerTrack.id,
-        );
-        if (cachedCount === 0) {
-          throw new BadGatewayException('Jobs provider unavailable');
-        }
       }
     }
 
