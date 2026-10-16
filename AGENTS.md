@@ -34,6 +34,13 @@ This project uses `bun` as it's package manager. Always use `bun` for commands a
 
 ---
 
+# Pattern conventions
+
+- Always follow SemVer patterns for commits and branches.
+- Create descritive PRs titles and descriptions.
+
+---
+
 # References
 
 - To understand more about the project structure and architecture, read `docs/STRUCTURE.md`.
