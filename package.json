@@ -24,7 +24,7 @@
     "typecheck": "bun --cwd Backend tsc --noEmit && bun --cwd Frontend tsc --noEmit && bun --cwd shared tsc --noEmit",
     "format:backend": "bun --cwd Backend format",
     "format:frontend": "bun --cwd Frontend format",
-    "format": "bun --cwd Backend format && bun --cwd Frontend format && bunx prettier --write \"shared/src/**/*.ts\"",
+    "format": "bun --cwd Backend format && bun --cwd Frontend format && bun --cwd Backend prettier --write \"../shared/src/**/*.ts\"",
     "test": "bun --cwd Backend test && bun --cwd Frontend test",
     "db:migrate": "bun --cwd Backend db:migrate",
     "prepare": "husky || true"

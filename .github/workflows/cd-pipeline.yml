@@ -117,6 +117,7 @@ jobs:
     needs: [changes]
     if: needs.changes.outputs.infra == 'true' || inputs.force_deploy_infra == true
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -130,11 +131,41 @@ jobs:
         uses: hashicorp/setup-terraform@v3
         with:
           terraform_version: ~1.9.0
+          terraform_wrapper: false
 
       - name: Terraform Init & Apply
+        env:
+          TF_IN_AUTOMATION: "true"
         run: |
-          terraform -chdir=Infra init
-          terraform -chdir=Infra apply -auto-approve
+          terraform -chdir=Infra init -input=false -no-color
+
+          # -input=false is required. A required variable with no value makes
+          # Terraform prompt on stdin, and Actions keeps that pipe open, so the
+          # job waits until the 6 hour default timeout and blocks every later deploy.
+          set +e
+          terraform -chdir=Infra apply -input=false -auto-approve -lock-timeout=30s -no-color 2>&1 | tee /tmp/tf-apply.log
+          code=${PIPESTATUS[0]}
+          set -e
+          if [ "$code" -eq 0 ]; then
+            exit 0
+          fi
+
+          # Cancelled runs are SIGKILLed after Terraform has already locked the
+          # GCS state (the lock is taken before the variable prompt). Only clear
+          # locks left by a GitHub-hosted runner.
+          if grep -q "Error acquiring the state lock" /tmp/tf-apply.log && grep -q "runner@" /tmp/tf-apply.log; then
+            LOCK_ID=$(sed -n 's/^[[:space:]]*ID:[[:space:]]*//p' /tmp/tf-apply.log | head -n1 | tr -d '[:space:]')
+            if [ -z "$LOCK_ID" ]; then
+              echo "::error::Terraform state is locked by a cancelled runner, but the lock ID could not be parsed."
+              exit "$code"
+            fi
+            echo "Releasing stale Terraform state lock ${LOCK_ID} left by a cancelled GitHub Actions run."
+            terraform -chdir=Infra force-unlock -force "$LOCK_ID"
+            terraform -chdir=Infra apply -input=false -auto-approve -lock-timeout=30s -no-color
+            exit $?
+          fi
+
+          exit "$code"
 
   run-migrations:
     name: Database Migrations (TypeORM)
