@@ -413,6 +413,7 @@ export interface DynamicRoadmapNodeDto {
   sequenceOrder: number;
   skillId: string | null;
   status: DynamicRoadmapNodeStatus;
+  lessons?: RoadmapLessonDto[];
   children: DynamicRoadmapNodeDto[];
 }
 

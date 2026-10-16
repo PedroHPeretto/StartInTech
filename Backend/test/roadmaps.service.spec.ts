@@ -5,11 +5,8 @@ import {
   SkillPriority,
   type RoadmapNodeResponseDto,
 } from '@startintech/shared';
-import { describe, expect, it } from 'vitest';
-import type {
-  ProfileRecord,
-  ProfilesRepository,
-} from '../src/profiles/profiles.repository.js';
+import { describe, expect, it, vi } from 'vitest';
+import type { ProfilesRepository } from '../src/profiles/profiles.repository.js';
 import { ProfilesService } from '../src/profiles/profiles.service.js';
 import type {
   CareerRoadmapRecord,
@@ -18,6 +15,7 @@ import type {
 } from '../src/roadmaps/roadmaps.repository.js';
 import type { LatestPresentSkillsResult } from '../src/resumes/resumes.repository.js';
 import { ResumesService } from '../src/resumes/resumes.service.js';
+import { RoadmapShClient } from '../src/roadmaps/roadmap-sh.client.js';
 import { RoadmapsService } from '../src/roadmaps/roadmaps.service.js';
 
 const USER_ID = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
@@ -28,31 +26,32 @@ const SOFTWARE_TRACK = {
   slug: 'software-development',
 };
 
-const PROFILE: ProfileRecord = {
+const PROFILE = {
   id: 'profile-1',
   userId: USER_ID,
   fullName: 'Ana Silva',
   seniorityLevel: SeniorityLevel.JUNIOR,
   bio: null,
   careerTrack: SOFTWARE_TRACK,
+  isProfileComplete: true as const,
 };
 
 class FakeRoadmapsRepository implements RoadmapsRepository {
-  calls = 0;
   lastCareerTrackId: string | null = null;
+  findCalls = 0;
 
   constructor(private readonly roadmap: CareerRoadmapRecord | null) {}
 
   findWithNodesByCareerTrackId(
     careerTrackId: string,
   ): Promise<CareerRoadmapRecord | null> {
-    this.calls += 1;
+    this.findCalls += 1;
     this.lastCareerTrackId = careerTrackId;
     return Promise.resolve(this.roadmap);
   }
 }
 
-function profilesService(profile: ProfileRecord | null): ProfilesService {
+function profilesService(profile: typeof PROFILE | null): ProfilesService {
   const repository: ProfilesRepository = {
     findCareerTrackById: () => Promise.resolve(null),
     findByUserId: () => Promise.resolve(profile),
@@ -73,17 +72,19 @@ function resumesService(
 }
 
 function roadmapsService(
-  profile: ProfileRecord | null,
-  roadmap: CareerRoadmapRecord | null,
+  profile: typeof PROFILE | null,
+  roadmap: CareerRoadmapRecord | null = null,
   latestSkills: LatestPresentSkillsResult = {
     hasResumeAnalyzed: false,
     presentSkillIds: [],
   },
+  roadmapSh: RoadmapShClient = new RoadmapShClient(),
 ): { service: RoadmapsService; repository: FakeRoadmapsRepository } {
   const repository = new FakeRoadmapsRepository(roadmap);
   const service = new RoadmapsService(
     profilesService(profile),
     resumesService(latestSkills),
+    roadmapSh,
     repository,
   );
   return { service, repository };
@@ -108,227 +109,147 @@ function node(
   };
 }
 
-function collectIds(nodes: RoadmapNodeResponseDto[]): string[] {
-  const ids: string[] = [];
-  const visit = (items: RoadmapNodeResponseDto[]) => {
-    for (const item of items) {
-      ids.push(item.id);
-      visit(item.children);
-    }
-  };
-  visit(nodes);
-  return ids;
-}
-
-function hasEdge(
+function findNodeById(
   nodes: RoadmapNodeResponseDto[],
-  parentId: string,
-  childId: string,
-): boolean {
+  id: string,
+): RoadmapNodeResponseDto | undefined {
   for (const item of nodes) {
-    if (
-      item.id === parentId &&
-      item.children.some((child) => child.id === childId)
-    ) {
-      return true;
+    if (item.id === id) {
+      return item;
     }
-    if (hasEdge(item.children, parentId, childId)) {
-      return true;
+    const nested = findNodeById(item.children, id);
+    if (nested) {
+      return nested;
     }
   }
-  return false;
+  return undefined;
 }
 
 describe('RoadmapsService', () => {
-  it('nests flat nodes more than one level deep for the profile career', async () => {
-    const roadmap: CareerRoadmapRecord = {
-      id: 'roadmap-1',
-      title: 'Trilha de Desenvolvimento de Software',
-      description: 'Da lógica até a primeira aplicação web',
-      nodes: [
-        node('fundamentos', null, 1, SkillPriority.ESSENTIAL, 'Fundamentos'),
-        node('logica', 'fundamentos', 1, SkillPriority.ESSENTIAL, 'Lógica'),
-        node(
-          'estruturas',
-          'logica',
-          1,
-          SkillPriority.RECOMMENDED,
-          'Estruturas de dados',
-        ),
-      ],
-    };
-    const { service, repository } = roadmapsService(PROFILE, roadmap);
-
-    const result = await service.getMyTrack(USER_ID);
-
-    expect(repository.lastCareerTrackId).toBe(SOFTWARE_TRACK.id);
-    expect(result).toEqual({
-      id: 'roadmap-1',
-      title: 'Trilha de Desenvolvimento de Software',
-      description: 'Da lógica até a primeira aplicação web',
-      careerTrack: SOFTWARE_TRACK,
-      nodes: [
-        {
-          id: 'fundamentos',
-          title: 'Fundamentos',
-          description: null,
-          priority: SkillPriority.ESSENTIAL,
-          sequenceOrder: 1,
-          skillId: null,
-          lessons: [],
-          children: [
+  it('loads nested nodes and attaches lessons only on the pack owner topic', async () => {
+    const client = new RoadmapShClient();
+    client.fetchImpl = vi.fn(async (url: string) => {
+      if (url.includes('v1-official-roadmap/full-stack')) {
+        return {
+          ok: true,
+          status: 200,
+          json: async () => ({
+            _id: 'roadmap-1',
+            description: 'Full stack path',
+            title: { page: 'Full Stack Developer' },
+          }),
+        };
+      }
+      if (url.includes('v1-roadmap-tree-mapping/full-stack')) {
+        return {
+          ok: true,
+          status: 200,
+          json: async () => [
             {
-              id: 'logica',
-              title: 'Lógica',
-              description: null,
-              priority: SkillPriority.ESSENTIAL,
-              sequenceOrder: 1,
-              skillId: null,
-              lessons: [],
-              children: [
-                {
-                  id: 'estruturas',
-                  title: 'Estruturas de dados',
-                  description: null,
-                  priority: SkillPriority.RECOMMENDED,
-                  sequenceOrder: 1,
-                  skillId: null,
-                  lessons: [],
-                  children: [],
-                },
-              ],
+              nodeId: 'internet',
+              text: 'Full Stack > Internet',
+              isOptional: false,
+              lessonPacks: [{ packId: 'pack-internet' }],
+            },
+            {
+              nodeId: 'http',
+              text: 'Full Stack > Internet > HTTP',
+              isOptional: true,
+              lessonPacks: [{ packId: 'pack-internet' }],
+            },
+            {
+              nodeId: 'html',
+              text: 'Full Stack > HTML',
+              isOptional: false,
             },
           ],
-        },
-      ],
-    });
-  });
+        };
+      }
+      if (url.includes('v1-list-lesson-packs')) {
+        return {
+          ok: true,
+          status: 200,
+          json: async () => [{ _id: 'pack-internet', slug: 'internet' }],
+        };
+      }
+      if (url.includes('v1-lesson-pack/internet')) {
+        return {
+          ok: true,
+          status: 200,
+          json: async () => ({
+            _id: 'pack-internet',
+            slug: 'internet',
+            freeLessonIds: ['lesson-1'],
+            lessons: [
+              {
+                _id: 'lesson-1',
+                title: 'What is HTTP?',
+                slug: 'what-is-http',
+                description: 'HTTP basics',
+                readingTime: { computed: 8 },
+                isFree: true,
+              },
+            ],
+          }),
+        };
+      }
+      return { ok: false, status: 404 };
+    }) as RoadmapShClient['fetchImpl'];
 
-  it('orders siblings by sequence and breaks ties with priority', async () => {
-    const roadmap: CareerRoadmapRecord = {
-      id: 'roadmap-1',
-      title: 'Trilha',
-      description: null,
-      nodes: [
-        node('root', null, 1, SkillPriority.ESSENTIAL, 'Root'),
-        node(
-          'advanced-late',
-          'root',
-          2,
-          SkillPriority.ADVANCED,
-          'Advanced late',
-        ),
-        node(
-          'essential-tie',
-          'root',
-          2,
-          SkillPriority.ESSENTIAL,
-          'Essential tie',
-        ),
-        node(
-          'recommended-tie',
-          'root',
-          2,
-          SkillPriority.RECOMMENDED,
-          'Recommended tie',
-        ),
-        node('first', 'root', 1, SkillPriority.ADVANCED, 'First'),
-      ],
-    };
-    const { service } = roadmapsService(PROFILE, roadmap);
-
+    const { service } = roadmapsService(PROFILE, null, undefined, client);
     const result = await service.getMyTrack(USER_ID);
 
-    expect(result.nodes[0]?.children.map((child) => child.id)).toEqual([
-      'first',
-      'essential-tie',
-      'recommended-tie',
-      'advanced-late',
-    ]);
-  });
+    expect(result.title).toBe('Full Stack Developer');
+    expect(result.careerTrack).toEqual(SOFTWARE_TRACK);
 
-  it('places a node whose parent is missing at the root', async () => {
-    const roadmap: CareerRoadmapRecord = {
-      id: 'roadmap-1',
-      title: 'Trilha',
-      description: null,
-      nodes: [
-        node('root', null, 2, SkillPriority.ESSENTIAL, 'Root'),
-        node(
-          'orphan',
-          'missing-parent',
-          1,
-          SkillPriority.RECOMMENDED,
-          'Orphan',
-        ),
-      ],
-    };
-    const { service } = roadmapsService(PROFILE, roadmap);
+    const internet = findNodeById(result.nodes, 'internet');
+    const http = findNodeById(result.nodes, 'http');
+    const html = findNodeById(result.nodes, 'html');
 
-    const result = await service.getMyTrack(USER_ID);
-
-    expect(result.nodes.map((item) => item.id)).toEqual(['orphan', 'root']);
-    expect(result.nodes[0]?.children).toEqual([]);
-    expect(result.nodes[1]?.children).toEqual([]);
-  });
-
-  it('returns when a parent reference is circular', async () => {
-    const roadmap: CareerRoadmapRecord = {
-      id: 'roadmap-1',
-      title: 'Trilha',
-      description: null,
-      nodes: [
-        node('node-a', 'node-b', 1, SkillPriority.ESSENTIAL, 'A'),
-        node('node-b', 'node-a', 2, SkillPriority.RECOMMENDED, 'B'),
-      ],
-    };
-    const { service } = roadmapsService(PROFILE, roadmap);
-
-    const result = await service.getMyTrack(USER_ID);
-    const ids = collectIds(result.nodes);
-
-    expect(ids).toHaveLength(2);
-    expect(new Set(ids)).toEqual(new Set(['node-a', 'node-b']));
-    expect(
-      hasEdge(result.nodes, 'node-a', 'node-b') ||
-        hasEdge(result.nodes, 'node-b', 'node-a'),
-    ).toBe(true);
-  });
-
-  it('throws not found when the user has no profile', async () => {
-    const { service, repository } = roadmapsService(null, null);
-
-    await expect(service.getMyTrack(USER_ID)).rejects.toThrow(
-      new NotFoundException('Profile not found'),
+    expect(internet?.children.map((child) => child.id)).toEqual(['http']);
+    expect(internet?.lessons).toHaveLength(1);
+    expect(internet?.lessons[0]?.url).toBe(
+      'https://roadmap.sh/packs/internet/what-is-http',
     );
-    expect(repository.calls).toBe(0);
+    expect(http?.lessons).toEqual([]);
+    expect(html?.priority).toBe(SkillPriority.ESSENTIAL);
+    expect(http?.priority).toBe(SkillPriority.RECOMMENDED);
   });
 
-  it('throws not found when the career has no roadmap', async () => {
-    const { service } = roadmapsService(PROFILE, null);
+  it('throws not found when the career slug has no Roadmap.sh mapping', async () => {
+    const unknownProfile = {
+      ...PROFILE,
+      careerTrack: {
+        ...SOFTWARE_TRACK,
+        slug: 'unknown-career',
+      },
+    };
+    const { service } = roadmapsService(unknownProfile);
 
     await expect(service.getMyTrack(USER_ID)).rejects.toThrow(
       new NotFoundException('Career roadmap not found'),
     );
   });
 
-  it('loads roadmap nodes in a single repository read', async () => {
-    const roadmap: CareerRoadmapRecord = {
-      id: 'roadmap-1',
-      title: 'Trilha',
-      description: null,
-      nodes: [
-        node('root', null, 1, SkillPriority.ESSENTIAL, 'Root'),
-        node('child-a', 'root', 1, SkillPriority.ESSENTIAL, 'Child A'),
-        node('child-b', 'root', 2, SkillPriority.RECOMMENDED, 'Child B'),
-        node('grandchild', 'child-a', 1, SkillPriority.ADVANCED, 'Grandchild'),
-      ],
-    };
-    const { service, repository } = roadmapsService(PROFILE, roadmap);
+  it('throws not found when Roadmap.sh returns 404', async () => {
+    const client = new RoadmapShClient();
+    client.fetchImpl = vi.fn(async () => ({
+      ok: false,
+      status: 404,
+    })) as RoadmapShClient['fetchImpl'];
+    const { service } = roadmapsService(PROFILE, null, undefined, client);
 
-    await service.getMyTrack(USER_ID);
+    await expect(service.getMyTrack(USER_ID)).rejects.toThrow(
+      NotFoundException,
+    );
+  });
 
-    expect(repository.calls).toBe(1);
+  it('throws not found when the user has no profile', async () => {
+    const { service } = roadmapsService(null);
+
+    await expect(service.getMyTrack(USER_ID)).rejects.toThrow(
+      new NotFoundException('Profile not found'),
+    );
   });
 
   describe('getMyTrackProgress', () => {
