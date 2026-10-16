@@ -59,7 +59,7 @@ export function PageHeader({
 
         {/* Brand for mobile/tablet */}
         <div className="lg:hidden">
-          <BrandHeader variant="compact" />
+          <BrandHeader href="/dashboard" variant="compact" />
         </div>
 
         {/* Greeting for desktop */}

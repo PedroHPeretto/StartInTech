@@ -51,6 +51,49 @@
 
   --font-heading: 'Comfortaa', sans-serif;
   --font-sans: 'Plus Jakarta Sans', sans-serif;
+
+  --shadow-glow:
+    0 0 0 1px rgb(2 132 199 / 0.15), 0 20px 60px -15px rgb(2 132 199 / 0.4);
+  --shadow-card-hover: 0 20px 40px -15px rgb(15 23 42 / 0.12);
+
+  --animate-float: float 6s ease-in-out infinite;
+  --animate-float-delayed: float 6s ease-in-out 3s infinite;
+  --animate-pulse-slow: pulse 4s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+
+  @keyframes float {
+    0%,
+    100% {
+      transform: translateY(0);
+    }
+    50% {
+      transform: translateY(-10px);
+    }
+  }
+}
+
+@utility text-gradient-brand {
+  background-image: linear-gradient(90deg, #0284c7, #10b981);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+@utility bg-grid {
+  background-image:
+    linear-gradient(to right, rgb(15 23 42 / 0.04) 1px, transparent 1px),
+    linear-gradient(to bottom, rgb(15 23 42 / 0.04) 1px, transparent 1px);
+  background-size: 36px 36px;
+}
+
+@utility glass {
+  background-color: rgba(255, 255, 255, 0.85);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(226, 232, 240, 0.8);
+}
+
+html {
+  scroll-behavior: smooth;
 }
 
 :root {

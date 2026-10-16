@@ -1,5 +1,5 @@
 import { useGoogleOAuth } from '@react-oauth/google';
-import { useNavigate } from '@tanstack/react-router';
+import { Link, useNavigate } from '@tanstack/react-router';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { flushSync } from 'react-dom';
 import googleIcon from '@/assets/icons/google-icon.svg';
@@ -93,7 +93,7 @@ export function LoginPage() {
     <div className="flex min-h-screen flex-col items-center justify-center bg-brand-blue px-4">
       <div className="w-full max-w-md rounded-3xl bg-white px-8 py-10 shadow-xl sm:px-10">
         <div className="mb-8 flex justify-center">
-          <BrandHeader href={undefined} showTagline />
+          <BrandHeader href="/" showTagline />
         </div>
 
         <h1 className="font-heading text-center text-2xl font-bold text-brand-midnight">
@@ -152,6 +152,15 @@ export function LoginPage() {
             {error}
           </p>
         ) : null}
+
+        <div className="mt-6 text-center">
+          <Link
+            to="/"
+            className="text-xs font-medium text-slate-400 transition-colors hover:text-brand-blue"
+          >
+            ← Voltar para a página inicial
+          </Link>
+        </div>
       </div>
     </div>
   );

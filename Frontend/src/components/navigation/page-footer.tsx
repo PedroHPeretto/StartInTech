@@ -34,7 +34,11 @@ export function PageFooter({
       <div className="mx-auto flex max-w-7xl flex-col gap-6 md:flex-row md:items-center md:justify-between">
         {/* Brand & Purpose */}
         <div className="flex flex-col gap-2">
-          <BrandHeader variant="compact" showTagline={false} />
+          <BrandHeader
+            href="/dashboard"
+            variant="compact"
+            showTagline={false}
+          />
           <p className="max-w-md text-xs font-sans text-slate-500">
             Acompanhe seu perfil, vagas compatíveis e recomendações inteligentes
             para impulsionar sua carreira em TI.
